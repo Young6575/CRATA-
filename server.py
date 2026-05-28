@@ -23,6 +23,7 @@ LOCAL_SETTINGS_FILE = ROOT / '처리관리' / 'local_settings.json'
 VIDEO_EXTENSIONS = {'.mp4', '.mov', '.mkv', '.avi', '.webm', '.m4v', '.mts', '.m2ts', '.mxf'}
 VIDEO_EDIT_QUEUE_FILE = ROOT / '처리관리' / 'video_edit_queue.json'
 VIDEO_STATUS_FILE = ROOT / 'video_status.json'
+VIDEO_SYSTEM_CACHE = {'at': 0, 'data': {}}
 VIDEO_PROCESS_STEPS = [
     {'id': 'raw_transcribe', 'label': '원본 전사', 'desc': 'large-v3로 원본 SRT/전사본 생성'},
     {'id': 'diarize', 'label': '화자분리', 'desc': '입력한 화자 수 기준으로 화자 라벨 부여'},
@@ -553,6 +554,117 @@ def infer_current_video_process(status):
     return ''
 
 
+def parse_first_number(text):
+    m = re.search(r'[-+]?\d+(?:\.\d+)?', str(text or ''))
+    return float(m.group(0)) if m else None
+
+
+def get_windows_memory_metrics():
+    if os.name != 'nt':
+        return {}
+    try:
+        import ctypes
+
+        class MEMORYSTATUSEX(ctypes.Structure):
+            _fields_ = [
+                ('dwLength', ctypes.c_ulong),
+                ('dwMemoryLoad', ctypes.c_ulong),
+                ('ullTotalPhys', ctypes.c_ulonglong),
+                ('ullAvailPhys', ctypes.c_ulonglong),
+                ('ullTotalPageFile', ctypes.c_ulonglong),
+                ('ullAvailPageFile', ctypes.c_ulonglong),
+                ('ullTotalVirtual', ctypes.c_ulonglong),
+                ('ullAvailVirtual', ctypes.c_ulonglong),
+                ('ullAvailExtendedVirtual', ctypes.c_ulonglong),
+            ]
+
+        stat = MEMORYSTATUSEX()
+        stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+        ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
+        total = stat.ullTotalPhys / (1024 ** 3)
+        avail = stat.ullAvailPhys / (1024 ** 3)
+        return {
+            'usage_percent': float(stat.dwMemoryLoad),
+            'used_gb': round(total - avail, 2),
+            'total_gb': round(total, 2),
+        }
+    except Exception:
+        return {}
+
+
+def get_cpu_usage_percent():
+    try:
+        if os.name == 'nt':
+            proc = subprocess.run(
+                ['wmic', 'cpu', 'get', 'LoadPercentage', '/value'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                timeout=2,
+                creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
+            )
+            value = parse_first_number(proc.stdout)
+            if value is not None:
+                return value
+        return None
+    except Exception:
+        return None
+
+
+def get_gpu_metrics():
+    smi = shutil.which('nvidia-smi')
+    if not smi:
+        return {}
+    try:
+        proc = subprocess.run(
+            [
+                smi,
+                '--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu',
+                '--format=csv,noheader,nounits',
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=2,
+            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0) if os.name == 'nt' else 0,
+        )
+        line = (proc.stdout or '').strip().splitlines()[0] if (proc.stdout or '').strip() else ''
+        if not line:
+            return {}
+        parts = [part.strip() for part in line.split(',')]
+        name = parts[0] if parts else ''
+        usage = parse_first_number(parts[1] if len(parts) > 1 else '')
+        mem_used = parse_first_number(parts[2] if len(parts) > 2 else '')
+        mem_total = parse_first_number(parts[3] if len(parts) > 3 else '')
+        temp = parse_first_number(parts[4] if len(parts) > 4 else '')
+        memory_percent = round((mem_used / mem_total) * 100, 1) if mem_used is not None and mem_total else None
+        return {
+            'name': name,
+            'usage_percent': usage,
+            'memory_used_mb': mem_used,
+            'memory_total_mb': mem_total,
+            'memory_percent': memory_percent,
+            'temperature_c': temp,
+        }
+    except Exception:
+        return {}
+
+
+def collect_system_metrics():
+    now = time.time()
+    if now - VIDEO_SYSTEM_CACHE.get('at', 0) < 5:
+        return VIDEO_SYSTEM_CACHE.get('data', {})
+    data = {
+        'machine': socket.gethostname(),
+        'cpu': {'usage_percent': get_cpu_usage_percent()},
+        'ram': get_windows_memory_metrics(),
+        'gpu': get_gpu_metrics(),
+        'updated_at': now_iso(),
+    }
+    VIDEO_SYSTEM_CACHE.update({'at': now, 'data': data})
+    return data
+
+
 def video_status_payload():
     status = {
         'status': 'idle',
@@ -565,6 +677,19 @@ def video_status_payload():
         'current_process': '',
         'process_steps': VIDEO_PROCESS_STEPS,
         'process_status': {},
+        'system_metrics': collect_system_metrics(),
+        'model_status': {
+            'active_model': '',
+            'device': 'cuda',
+            'compute': 'float16',
+            'download_status': '대기',
+            'download_progress': 0,
+        },
+        'model_download': {
+            'name': '',
+            'status': '대기',
+            'progress': 0,
+        },
         'updated_at': '',
     }
     status.update(read_video_status())
@@ -574,7 +699,14 @@ def video_status_payload():
         status['completed_files'] = status.get('completed')
     if not status.get('process_steps'):
         status['process_steps'] = VIDEO_PROCESS_STEPS
+    if status.get('status') == 'idle' and status.get('task'):
+        try:
+            pct = float(status.get('progress') if status.get('progress') is not None else status.get('progress_pct') or 0)
+        except (TypeError, ValueError):
+            pct = 0
+        status['status'] = 'done' if pct >= 100 else 'active'
     status['current_process'] = infer_current_video_process(status)
+    status['system_metrics'] = collect_system_metrics()
     return status
 
 
@@ -2379,6 +2511,23 @@ def create_video_encoding_task(data):
         'current_process_label': '원본 전사 대기',
         'process_steps': VIDEO_PROCESS_STEPS,
         'process_status': {},
+        'process_results': {},
+        'artifacts': [],
+        'system_metrics': collect_system_metrics(),
+        'model_status': {
+            'active_model': 'large-v3',
+            'device': 'cuda',
+            'compute': 'float16',
+            'task': '원본 전사 대기',
+            'download_status': '확인 대기',
+            'download_progress': 0,
+        },
+        'model_download': {
+            'name': 'large-v3',
+            'status': '확인 대기',
+            'progress': 0,
+            'message': '첫 실행이면 faster-whisper 모델 다운로드가 진행될 수 있습니다.',
+        },
         'review_order': ['raw_transcribe', 'diarize', 'transcript_quality_review', 'crata_term_correction', 'speaker_review', 'subtitle_preview_review', 'final_encode'],
     }
     write_json_file(VIDEO_STATUS_FILE, status)
@@ -2392,6 +2541,9 @@ def create_video_encoding_task(data):
 - ffmpeg, faster-whisper large-v3, pyannote diarization, subtitle burn-in, final encode 관련 실행 가능성을 확인하세요.
 - 실행 가능한 파이프라인이 없으면 임의 완료 처리하지 말고 필요한 스크립트/의존성/명령을 결과에 명확히 보고하세요.
 - 진행 중에는 video_status.json을 갱신하세요. 형식은 status(active|requested|waiting_preview_review|done|error), progress, current_file, batch_progress, total_files, completed_files, current_process, current_process_label, process_status, message, speaker_count 입니다.
+- 모델 다운로드 중에는 model_download.name, model_download.status, model_download.progress를 갱신하세요.
+- 현재 사용 중인 모델은 model_status.active_model, model_status.device, model_status.compute, model_status.task로 남기세요.
+- 각 프로세스 산출물은 process_results.<process_id> 또는 artifacts에 파일 경로와 설명을 남기세요. 대시보드에서 프로세스를 클릭하면 이 값들이 표시됩니다.
 - MXF는 웹 미리보기가 안 될 수 있지만 ffmpeg 입력으로는 처리 가능할 수 있습니다.
 
 소스 경로:

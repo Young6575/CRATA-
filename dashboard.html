@@ -6171,54 +6171,46 @@ body {
         </div>
       </div>
 
-      <!-- 실시간 진행률 그리드 -->
-      <div class="g2" style="margin-bottom: 10px;">
-        <!-- 현재 단일 파일 렌더링 카드 -->
-        <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; padding: 16px 20px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <div class="card-title" style="margin-bottom: 0;">현재 렌더링 파일 상태</div>
-            <span style="font-size: 11px; font-family: var(--font-mono); color: var(--text-muted);" id="video-current-status-lbl">대기 중</span>
+      <!-- 현재 요청 상태 / 데스크탑 리소스 -->
+      <div class="card" style="margin-bottom: 10px; padding: 16px 20px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px;">
+          <div>
+            <div class="card-title" style="margin-bottom:4px;">현재 영상 작업</div>
+            <div id="video-process-headline" style="font-size:12px;color:var(--text-muted);">작업 요청 대기 중</div>
+          </div>
+          <span style="font-size:11px;font-family:var(--font-mono);color:var(--text-muted);padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:var(--bg-input);white-space:nowrap;" id="video-current-status-lbl">대기</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:minmax(220px,0.8fr) minmax(260px,1.2fr) minmax(260px,1fr);gap:10px;margin-bottom:10px;">
+          <div style="border:1px solid var(--border);border-radius:var(--radius-md);background:rgba(255,255,255,0.015);padding:12px;">
+            <div style="font-size:11px;color:var(--text-muted);font-weight:800;text-transform:uppercase;margin-bottom:8px;">프로세스 진행률</div>
+            <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:8px;">
+              <span style="font-size:28px;font-weight:850;color:var(--text-white);font-family:var(--font-mono);line-height:1;" id="video-single-pct">0</span>
+              <span style="font-size:13px;color:var(--text-muted);">%</span>
+            </div>
+            <div style="height:6px;background:rgba(255,255,255,0.025);border:1px solid var(--border);border-radius:4px;overflow:hidden;">
+              <div id="video-single-bar" style="width:0%;height:100%;background:linear-gradient(90deg,var(--blue),#60a5fa);border-radius:4px;transition:var(--transition);"></div>
+            </div>
           </div>
 
-          <div style="margin-bottom: 8px;">
-            <div style="display: flex; align-items: baseline; gap: 6px; margin-bottom: 5px;">
-              <span style="font-size: 26px; font-weight: 800; color: var(--text-white); font-family: var(--font-mono); line-height: 1;" id="video-single-pct">0</span>
-              <span style="font-size: 13px; color: var(--text-muted);">%</span>
+          <div style="border:1px solid var(--border);border-radius:var(--radius-md);background:rgba(255,255,255,0.015);padding:12px;">
+            <div style="font-size:11px;color:var(--text-muted);font-weight:800;text-transform:uppercase;margin-bottom:8px;">소스 / 결과</div>
+            <div id="video-current-file-name" style="font-size:12px;line-height:1.45;color:var(--text);word-break:break-all;font-family:var(--font-mono);">
+              작업 요청이 들어오면 파일 경로와 결과 경로가 표시됩니다.
             </div>
-            <div style="height: 5px; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 3px; overflow: hidden;">
-              <div id="video-single-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--blue), #60a5fa); border-radius: 3px; transition: var(--transition);"></div>
-            </div>
+            <div id="video-time-elapsed-lbl" style="font-size:11.5px;color:var(--text-muted);margin-top:8px;">대기 중</div>
           </div>
 
-          <div style="font-size: 11.5px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 10px; color: var(--text); word-break: break-all; font-family: var(--font-mono);" id="video-current-file-name">
-            대기 상태 - 영상 인코딩이 시작되면 파일 정보가 표시됩니다.
+          <div style="border:1px solid var(--border);border-radius:var(--radius-md);background:rgba(255,255,255,0.015);padding:12px;">
+            <div style="font-size:11px;color:var(--text-muted);font-weight:800;text-transform:uppercase;margin-bottom:8px;">모델 / 다운로드</div>
+            <div id="video-model-status-card" style="display:flex;flex-direction:column;gap:7px;font-size:12px;color:var(--text);"></div>
           </div>
         </div>
 
-        <!-- 전체 배치 파일 완료 현황 -->
-        <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; padding: 16px 20px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <div class="card-title" style="margin-bottom: 0;">배치 파일 진행 현황</div>
-            <span style="font-size: 11px; font-family: var(--font-mono); color: var(--text-muted);" id="video-total-status-lbl">0 / 0 완료</span>
-          </div>
-
-          <div style="margin-bottom: 8px;">
-            <div style="display: flex; align-items: baseline; gap: 6px; margin-bottom: 5px;">
-              <span style="font-size: 26px; font-weight: 800; color: var(--text-white); font-family: var(--font-mono); line-height: 1;" id="video-batch-pct">0</span>
-              <span style="font-size: 13px; color: var(--text-muted);">%</span>
-            </div>
-            <div style="height: 5px; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 3px; overflow: hidden;">
-              <div id="video-batch-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--green), #34d399); border-radius: 3px; transition: var(--transition);"></div>
-            </div>
-          </div>
-
-          <div style="font-size: 11.5px; color: var(--text-muted);" id="video-time-elapsed-lbl">
-            인코딩 시작 시 경과 시간 및 잔여 시간 계산이 활성화됩니다.
-          </div>
-        </div>
+        <div id="video-system-metrics" style="display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:8px;"></div>
       </div>
 
-      <!-- 파이프라인 단계 시각화 & 완료 목록 -->
+      <!-- 프로세스 단계 / 선택 결과 -->
       <div class="g2">
         <!-- 파이프라인 단계 -->
         <div class="card" style="display: flex; flex-direction: column; gap: 8px; padding: 16px 20px;">
@@ -6233,14 +6225,11 @@ body {
           <div id="video-process-flow" style="display: flex; flex-direction: column; gap: 8px;"></div>
           </div>
 
-        <!-- 완료된 비디오 목록 -->
+        <!-- 프로세스 결과 -->
         <div class="card" style="display: flex; flex-direction: column; padding: 16px 20px;">
-          <div class="card-title">배치 작업 완료 목록</div>
-          <div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;" id="video-completed-list">
-            <div style="text-align: center; color: var(--text-muted); padding: 20px 0; font-size: 12.5px;">
-              완료된 렌더링 파일 목록이 여기에 기록됩니다.
-            </div>
-          </div>
+          <div class="card-title" style="margin-bottom:8px;">프로세스 결과</div>
+          <div id="video-process-result-panel" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;"></div>
+          <div id="video-completed-list" style="display:none;"></div>
         </div>
       </div>
 
@@ -11420,6 +11409,9 @@ const VIDEO_PROCESS_ALIASES = {
   final: 'final_encode',
 };
 
+let selectedVideoProcessId = '';
+let latestVideoStatusData = {};
+
 function defaultVideoProcessSteps() {
   return VIDEO_PROCESS_STEPS.map(step => ({ ...step }));
 }
@@ -11470,6 +11462,74 @@ function processStateLabel(state) {
   return '대기';
 }
 
+function selectVideoProcess(id) {
+  selectedVideoProcessId = normalizeVideoProcessId(id);
+  const completedFiles = Array.isArray(latestVideoStatusData.completed_files) ? latestVideoStatusData.completed_files : (Array.isArray(latestVideoStatusData.completed) ? latestVideoStatusData.completed : []);
+  const completedCount = Number.isFinite(Number(latestVideoStatusData.done)) ? Number(latestVideoStatusData.done) : completedFiles.length;
+  const totalCount = Number(latestVideoStatusData.total_files ?? latestVideoStatusData.total ?? 0);
+  renderVideoProcessFlow(latestVideoStatusData, totalCount, completedCount);
+}
+
+function videoArtifactEntries(data, stepId) {
+  const results = data?.process_results || data?.process_outputs || {};
+  const direct = results[stepId] || results[normalizeVideoProcessId(stepId)] || [];
+  const list = Array.isArray(direct) ? direct : (direct ? [direct] : []);
+  const artifacts = Array.isArray(data?.artifacts) ? data.artifacts : [];
+  const completed = Array.isArray(data?.completed_files) ? data.completed_files.map(path => ({ path, kind: '완료 파일' })) : [];
+  const byStep = artifacts.filter(item => normalizeVideoProcessId(item.process || item.step || item.id) === stepId);
+  const extra = [];
+  if (stepId === 'subtitle_preview_review' && data?.preview_file) extra.push({ path: data.preview_file, kind: '미리보기' });
+  if (stepId === 'final_encode') extra.push(...completed);
+  return [...list, ...byStep, ...extra].map(item => typeof item === 'string' ? { path: item } : item);
+}
+
+function renderVideoProcessResult(data, steps, selectedId) {
+  const panel = document.getElementById('video-process-result-panel');
+  if (!panel) return;
+  const step = steps.find(item => item.id === selectedId) || steps[0];
+  if (!step) {
+    panel.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:12.5px;">프로세스를 선택하면 결과가 표시됩니다.</div>';
+    return;
+  }
+  const processStatus = data?.process_status && typeof data.process_status === 'object' ? data.process_status : {};
+  const state = processStatus[step.id]?.status || step.status || (selectedId === currentVideoProcessId(data || {}, steps) ? (data?.status === 'waiting_preview_review' ? 'waiting' : 'active') : 'pending');
+  const progress = Math.round(Number(processStatus[step.id]?.progress ?? step.progress ?? (state === 'done' ? 100 : state === 'active' ? (data?.progress ?? data?.progress_pct ?? 0) : 0)));
+  const note = processStatus[step.id]?.message || processStatus[step.id]?.note || '';
+  const entries = videoArtifactEntries(data || {}, step.id);
+  const entriesHtml = entries.length ? entries.map(item => {
+    const path = item.path || item.file || item.url || '';
+    const title = item.title || item.name || item.kind || '결과 파일';
+    const isVideo = /\.(mp4|mov|mkv|avi|webm|m4v|mxf)$/i.test(path);
+    const previewBtn = isVideo && path ? `<button onclick="previewDesktopVideo('${escapeHtml(escapeJs(path))}')" style="padding:5px 8px;border-radius:var(--radius-sm);border:1px solid rgba(59,130,246,0.32);background:rgba(59,130,246,0.12);color:#bfdbfe;font-size:11px;font-weight:800;cursor:pointer;">미리보기</button>` : '';
+    return `
+      <div style="padding:9px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:rgba(255,255,255,0.015);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;">
+        <div style="min-width:0;">
+          <div style="font-size:12px;font-weight:800;color:var(--text-white);">${escapeHtml(title)}</div>
+          <div style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(path || item.message || item.note || '결과 경로 대기 중')}</div>
+        </div>
+        ${previewBtn}
+      </div>
+    `;
+  }).join('') : '<div style="padding:18px;text-align:center;color:var(--text-muted);font-size:12px;border:1px dashed var(--border);border-radius:var(--radius-sm);">아직 이 프로세스의 결과 파일이 없습니다.</div>';
+
+  panel.innerHTML = `
+    <div style="padding:12px;border:1px solid var(--border);border-radius:var(--radius-md);background:rgba(255,255,255,0.018);">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:8px;">
+        <div>
+          <div style="font-size:15px;font-weight:850;color:var(--text-white);">${escapeHtml(step.label)}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${escapeHtml(step.desc || '')}</div>
+        </div>
+        <span style="font-size:10.5px;font-weight:800;padding:4px 8px;border-radius:999px;border:1px solid var(--border);color:var(--text);white-space:nowrap;">${processStateLabel(state)} · ${Math.max(0, Math.min(100, progress))}%</span>
+      </div>
+      <div style="height:5px;background:rgba(255,255,255,0.025);border:1px solid var(--border);border-radius:4px;overflow:hidden;">
+        <div style="height:100%;width:${Math.max(0, Math.min(100, progress))}%;background:linear-gradient(90deg,var(--blue),#60a5fa);border-radius:4px;"></div>
+      </div>
+      ${note ? `<div style="margin-top:8px;font-size:11.5px;color:var(--text-muted);line-height:1.45;">${escapeHtml(note)}</div>` : ''}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">${entriesHtml}</div>
+  `;
+}
+
 function renderVideoProcessFlow(data, totalCount, completedCount) {
   const flow = document.getElementById('video-process-flow');
   const currentEl = document.getElementById('video-process-current');
@@ -11485,6 +11545,9 @@ function renderVideoProcessFlow(data, totalCount, completedCount) {
   const processStatus = data?.process_status && typeof data.process_status === 'object' ? data.process_status : {};
 
   const activeStep = steps[currentIndex] || null;
+  if (!selectedVideoProcessId || !steps.some(step => step.id === selectedVideoProcessId)) {
+    selectedVideoProcessId = activeStep?.id || steps[0]?.id || '';
+  }
   if (currentEl) {
     const message = data?.message ? ` · ${data.message}` : '';
     currentEl.textContent = activeStep
@@ -11530,9 +11593,10 @@ function renderVideoProcessFlow(data, totalCount, completedCount) {
           : state === 'error'
             ? 'var(--red)'
             : 'var(--text-muted)';
-    const fraction = totalCount ? `${state === 'done' ? totalCount : state === 'active' || state === 'waiting' ? completedCount : 0} / ${totalCount}` : `${Math.round(Math.max(0, Math.min(100, stepProgress)))}%`;
+    const fraction = `${Math.round(Math.max(0, Math.min(100, stepProgress)))}%`;
+    const selected = selectedVideoProcessId === step.id;
     return `
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 12px;border-radius:var(--radius-md);border:1px solid ${border};background:${bg};">
+      <div onclick="selectVideoProcess('${escapeHtml(escapeJs(step.id))}')" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 12px;border-radius:var(--radius-md);border:1px solid ${selected ? 'rgba(var(--accent-rgb),0.55)' : border};background:${selected ? 'rgba(var(--accent-rgb),0.08)' : bg};cursor:pointer;">
         <div style="display:flex;align-items:center;gap:10px;min-width:0;">
           <span style="width:8px;height:8px;border-radius:50%;background:${dot};box-shadow:${state === 'active' || state === 'waiting' ? `0 0 8px ${dot}` : 'none'};flex-shrink:0;"></span>
           <div style="min-width:0;">
@@ -11547,6 +11611,74 @@ function renderVideoProcessFlow(data, totalCount, completedCount) {
       </div>
     `;
   }).join('');
+  renderVideoProcessResult(data || {}, steps, selectedVideoProcessId);
+}
+
+function metricValue(value, suffix = '%') {
+  const num = Number(value);
+  return Number.isFinite(num) ? `${Math.round(num)}${suffix}` : '-';
+}
+
+function renderVideoSystemMetrics(data) {
+  const el = document.getElementById('video-system-metrics');
+  if (!el) return;
+  const metrics = data?.system_metrics || data?.desktop_metrics || {};
+  const cpu = metrics.cpu || {};
+  const ram = metrics.ram || metrics.memory || {};
+  const gpu = metrics.gpu || {};
+  const ramText = Number.isFinite(Number(ram.used_gb)) && Number.isFinite(Number(ram.total_gb))
+    ? `${Number(ram.used_gb).toFixed(1)} / ${Number(ram.total_gb).toFixed(1)}GB`
+    : metricValue(ram.usage_percent ?? ram.percent);
+  const gpuMemText = Number.isFinite(Number(gpu.memory_used_mb)) && Number.isFinite(Number(gpu.memory_total_mb))
+    ? `${Math.round(Number(gpu.memory_used_mb))} / ${Math.round(Number(gpu.memory_total_mb))}MB`
+    : '-';
+  const cards = [
+    ['CPU', metricValue(cpu.usage_percent ?? cpu.percent), cpu.temperature_c ? `온도 ${Math.round(Number(cpu.temperature_c))}°C` : '온도 -'],
+    ['RAM', ramText, metricValue(ram.usage_percent ?? ram.percent)],
+    ['GPU', gpu.name || '-', `${metricValue(gpu.usage_percent ?? gpu.percent)} · ${gpu.temperature_c ? `${Math.round(Number(gpu.temperature_c))}°C` : '온도 -'}`],
+    ['GPU 메모리', gpuMemText, metricValue(gpu.memory_percent)],
+  ];
+  el.innerHTML = cards.map(([label, value, sub]) => `
+    <div style="padding:10px 11px;border:1px solid var(--border);border-radius:var(--radius-md);background:rgba(255,255,255,0.012);min-width:0;">
+      <div style="font-size:10.5px;color:var(--text-muted);font-weight:800;text-transform:uppercase;">${escapeHtml(label)}</div>
+      <div style="font-size:13px;color:var(--text-white);font-weight:800;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(value)}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(sub)}</div>
+    </div>
+  `).join('');
+}
+
+function renderVideoModelStatus(data) {
+  const el = document.getElementById('video-model-status-card');
+  if (!el) return;
+  const model = data?.model_status || data?.model || {};
+  const download = data?.model_download || model.download || {};
+  const name = model.active_model || model.name || data?.model_name || '대기';
+  const device = model.device || data?.model_device || 'cuda';
+  const compute = model.compute || data?.model_compute || 'float16';
+  const downloadName = download.name || name;
+  const downloadStatus = download.status || model.download_status || (name === '대기' ? '대기' : '확인 대기');
+  const downloadProgress = Number(download.progress ?? model.download_progress ?? 0);
+  const task = model.task || data?.current_process_label || '';
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;gap:10px;">
+      <span style="color:var(--text-muted);">현재 모델</span>
+      <b style="color:var(--text-white);font-family:var(--font-mono);font-size:11.5px;">${escapeHtml(name)}</b>
+    </div>
+    <div style="display:flex;justify-content:space-between;gap:10px;">
+      <span style="color:var(--text-muted);">실행 장치</span>
+      <b style="color:var(--text-white);font-family:var(--font-mono);font-size:11.5px;">${escapeHtml(device)} · ${escapeHtml(compute)}</b>
+    </div>
+    <div>
+      <div style="display:flex;justify-content:space-between;gap:10px;margin-bottom:5px;">
+        <span style="color:var(--text-muted);">${escapeHtml(downloadName)} 다운로드</span>
+        <b style="color:var(--text-white);font-family:var(--font-mono);font-size:11.5px;">${escapeHtml(downloadStatus)} · ${Math.max(0, Math.min(100, Math.round(downloadProgress)))}%</b>
+      </div>
+      <div style="height:5px;background:rgba(255,255,255,0.025);border:1px solid var(--border);border-radius:4px;overflow:hidden;">
+        <div style="height:100%;width:${Math.max(0, Math.min(100, downloadProgress))}%;background:linear-gradient(90deg,var(--green),#34d399);border-radius:4px;"></div>
+      </div>
+    </div>
+    ${task ? `<div style="font-size:11.5px;color:var(--text-muted);line-height:1.4;">${escapeHtml(task)}</div>` : ''}
+  `;
 }
 
 // Real Polling from backend json (if running locally on webserver)
@@ -11571,14 +11703,12 @@ function pollVideoStatus() {
 }
 
 function updateVideoUI(data) {
+  latestVideoStatusData = data || {};
   const currentStatusLbl = document.getElementById('video-current-status-lbl');
   const singlePct = document.getElementById('video-single-pct');
   const singleBar = document.getElementById('video-single-bar');
   const currentFileName = document.getElementById('video-current-file-name');
-  
-  const totalStatusLbl = document.getElementById('video-total-status-lbl');
-  const batchPct = document.getElementById('video-batch-pct');
-  const batchBar = document.getElementById('video-batch-bar');
+  const headline = document.getElementById('video-process-headline');
   const elapsedLbl = document.getElementById('video-time-elapsed-lbl');
   const navDot = document.getElementById('nav-video-dot');
   
@@ -11590,57 +11720,67 @@ function updateVideoUI(data) {
   const completedFiles = Array.isArray(data.completed_files) ? data.completed_files : (Array.isArray(data.completed) ? data.completed : []);
   const completedCount = Number.isFinite(Number(data.done)) ? Number(data.done) : completedFiles.length;
   const totalCount = Number(data.total_files ?? data.total ?? 0);
+  const steps = videoProcessStepsFromStatus(data || {});
+  const currentProcessId = currentVideoProcessId(data || {}, steps);
+  const currentProcess = steps.find(step => step.id === currentProcessId);
+  const currentLabel = currentProcess?.label || '대기';
+  const processStatus = data?.process_status && typeof data.process_status === 'object' ? data.process_status : {};
+  const processProgress = Number(processStatus[currentProcessId]?.progress);
+  const activeProgress = Number.isFinite(processProgress) ? processProgress : progress;
   
   // Update UI Labels
-  currentStatusLbl.textContent = status === 'active'
+  if (currentStatusLbl) currentStatusLbl.textContent = status === 'active'
     ? '가공 중'
     : (status === 'requested'
       ? '요청됨'
       : (status === 'waiting_preview_review' ? '미리보기 확인 대기' : (status === 'done' || status === 'completed' ? '완료' : '대기')));
-  singlePct.textContent = Math.round(progress);
-  singleBar.style.width = `${progress}%`;
-  currentFileName.textContent = currentFile ? currentFile : '대기 상태 - 영상 인코딩이 시작되면 파일 정보가 표시됩니다.';
-  
-  totalStatusLbl.textContent = `${completedCount} / ${totalCount} 완료`;
-  batchPct.textContent = Math.round(batchProgress);
-  batchBar.style.width = `${batchProgress}%`;
+  if (singlePct) singlePct.textContent = Math.round(activeProgress);
+  if (singleBar) singleBar.style.width = `${Math.max(0, Math.min(100, activeProgress))}%`;
+  if (headline) {
+    headline.textContent = status === 'idle'
+      ? '작업 요청 대기 중'
+      : `${currentLabel}${totalCount ? ` · ${completedCount}/${totalCount} 파일` : ''}`;
+  }
+  if (currentFileName) {
+    const resultLine = data.preview_file ? `\n미리보기: ${data.preview_file}` : (completedFiles[0] ? `\n최근 결과: ${completedFiles[completedFiles.length - 1]}` : '');
+    currentFileName.textContent = currentFile ? `${currentFile}${resultLine}` : '작업 요청이 들어오면 파일 경로와 결과 경로가 표시됩니다.';
+  }
   
   if (status === 'active') {
-    navDot.style.backgroundColor = 'var(--green)';
-    navDot.style.boxShadow = '0 0 8px var(--green)';
-    elapsedLbl.textContent = `파이프라인 실행 중 | 예상 잔여 시간: ${(totalCount - completedCount) * 4}분`;
+    if (navDot) {
+      navDot.style.backgroundColor = 'var(--green)';
+      navDot.style.boxShadow = '0 0 8px var(--green)';
+    }
+    if (elapsedLbl) elapsedLbl.textContent = `${currentLabel} 진행 중`;
   } else if (status === 'requested') {
-    navDot.style.backgroundColor = 'var(--yellow)';
-    navDot.style.boxShadow = '0 0 8px var(--yellow)';
-    elapsedLbl.textContent = 'CLI 에이전트 작업으로 등록되었습니다. 작업 지시서에서 실제 처리 결과를 확인하세요.';
+    if (navDot) {
+      navDot.style.backgroundColor = 'var(--yellow)';
+      navDot.style.boxShadow = '0 0 8px var(--yellow)';
+    }
+    if (elapsedLbl) elapsedLbl.textContent = 'CLI 에이전트 작업으로 등록되었습니다.';
   } else if (status === 'waiting_preview_review') {
-    navDot.style.backgroundColor = 'var(--blue)';
-    navDot.style.boxShadow = '0 0 8px var(--blue)';
-    elapsedLbl.textContent = `미리보기 검수 대기 중${data.preview_file ? ` | ${data.preview_file}` : ''}`;
+    if (navDot) {
+      navDot.style.backgroundColor = 'var(--blue)';
+      navDot.style.boxShadow = '0 0 8px var(--blue)';
+    }
+    if (elapsedLbl) elapsedLbl.textContent = `미리보기 검수 대기 중${data.preview_file ? ` | ${data.preview_file}` : ''}`;
   } else if (status === 'done' || status === 'completed') {
-    navDot.style.backgroundColor = 'var(--green)';
-    navDot.style.boxShadow = '0 0 8px var(--green)';
-    elapsedLbl.textContent = '영상 작업이 완료되었습니다.';
+    if (navDot) {
+      navDot.style.backgroundColor = 'var(--green)';
+      navDot.style.boxShadow = '0 0 8px var(--green)';
+    }
+    if (elapsedLbl) elapsedLbl.textContent = '영상 작업이 완료되었습니다.';
   } else {
-    navDot.style.backgroundColor = 'var(--text-muted)';
-    navDot.style.boxShadow = 'none';
-    elapsedLbl.textContent = '인코딩 시작 시 경과 시간 및 잔여 시간 계산이 활성화됩니다.';
+    if (navDot) {
+      navDot.style.backgroundColor = 'var(--text-muted)';
+      navDot.style.boxShadow = 'none';
+    }
+    if (elapsedLbl) elapsedLbl.textContent = '대기 중';
   }
   
   renderVideoProcessFlow(data, totalCount, completedCount);
-  
-  // Update completed list
-  const list = document.getElementById('video-completed-list');
-  if (completedFiles.length > 0) {
-    list.innerHTML = completedFiles.map(f => `
-      <div style="display:flex; justify-content:space-between; align-items:center; padding: 6px 10px; background: rgba(255,255,255,0.01); border:1px solid var(--border); border-radius:var(--radius-sm); font-size:12px;">
-        <span style="font-family:var(--font-mono); color:var(--text-hover); font-size:11px;">${f}</span>
-        <span style="color:var(--green); font-weight:bold;">완료 ✓</span>
-      </div>
-    `).join('');
-  } else {
-    list.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 40px 0; font-size: 12.5px;">완료된 렌더링 파일 목록이 여기에 기록됩니다.</div>';
-  }
+  renderVideoSystemMetrics(data);
+  renderVideoModelStatus(data);
   
   // Update dashboard mini tracker too!
   const homeVideoCard = document.getElementById('home-video-card');
