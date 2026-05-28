@@ -1830,8 +1830,9 @@ def terminate_process_tree(pid):
                 timeout=8,
                 creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
             )
-            output = (proc.stdout or '').strip()
-            return proc.returncode == 0, output or f'taskkill 종료 코드 {proc.returncode}'
+            if proc.returncode == 0:
+                return True, f'PID {pid} 및 하위 프로세스를 종료했습니다.'
+            return False, f'taskkill 종료 코드 {proc.returncode}'
         os.kill(pid, 15)
         return True, f'PID {pid} 종료 신호를 보냈습니다.'
     except ProcessLookupError:

@@ -7398,9 +7398,41 @@ function formatMessageText(value) {
     .replace(/`([^`]+)`/g, '<code>$1</code>');
 }
 
+function formatElapsedText(value) {
+  if (value === null || value === undefined || value === '' || value === '—') return '—';
+  let seconds = 0;
+  if (typeof value === 'number') {
+    seconds = value;
+  } else {
+    const raw = String(value).trim();
+    const match = raw.match(/(\d+(?:\.\d+)?)/);
+    if (!match) return raw;
+    seconds = Number(match[1]);
+    if (/ms\b/i.test(raw)) seconds = seconds / 1000;
+  }
+  if (!Number.isFinite(seconds)) return String(value);
+  const total = Math.max(0, Math.round(seconds));
+  if (total < 60) return `${total}초`;
+  const minutes = Math.floor(total / 60);
+  const sec = total % 60;
+  if (minutes < 60) return `${minutes}분 ${String(sec).padStart(2, '0')}초`;
+  const hours = Math.floor(minutes / 60);
+  const remainMin = minutes % 60;
+  return `${hours}시간 ${String(remainMin).padStart(2, '0')}분`;
+}
+
+function cleanRuntimeLogMessage(value) {
+  const text = String(value || '');
+  if (text.includes('사용자 요청으로 작업을 중지') && (text.includes('����') || text.includes('���μ���') || text.includes('�'))) {
+    const pids = [...new Set((text.match(/PID\s+\d+/g) || []).map(pid => pid.replace(/\s+/g, ' ')))];
+    return `사용자 요청으로 작업을 중지했습니다. 관련 CLI 프로세스를 종료했습니다.${pids.length ? ` (${pids.slice(0, 4).join(', ')}${pids.length > 4 ? ` 외 ${pids.length - 4}개` : ''})` : ''}`;
+  }
+  return text;
+}
+
 function taskWorkedLabel(task) {
   const speed = task?.collabStats?.speed;
-  if (speed && speed !== '—') return `Worked for ${speed} ›`;
+  if (speed && speed !== '—') return `Worked for ${formatElapsedText(speed)} ›`;
   const start = Date.parse(task?.started_at || task?.created_at || '');
   const end = Date.parse(task?.completed_at || task?.updated_at || '');
   if (Number.isFinite(start) && Number.isFinite(end) && end >= start) {
@@ -9645,7 +9677,7 @@ function taskRuntimeStats(task, runnerLabel) {
     attempts: attempts > 1 ? `${attempts}회 시도` : `${Math.max(attempts, 1)}회 실행`,
     engine,
     state: taskStatusLabel(task.status),
-    elapsed: raw.speed || '—',
+    elapsed: formatElapsedText(raw.speed || '—'),
   };
 }
 
@@ -9785,7 +9817,7 @@ function selectTask(idx) {
         ${taskLogs.map(l => `
           <div style="display:grid;grid-template-columns:auto 1fr auto;gap:8px;margin-bottom:8px;color:var(--text);">
             <span style="color:var(--yellow);font-weight:800;">[${escapeHtml(l.sender)}]</span>
-            <span style="color:var(--text-hover);">${escapeHtml(l.msg)}</span>
+            <span style="color:var(--text-hover);">${escapeHtml(cleanRuntimeLogMessage(l.msg))}</span>
             <span style="color:var(--text-muted);font-size:10px;">${escapeHtml(l.time)}</span>
           </div>
         `).join('')}
