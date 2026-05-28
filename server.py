@@ -109,6 +109,74 @@ def local_ipv4_addresses():
     return sorted(addresses)
 
 
+def run_git_command(args, timeout=120):
+    try:
+        proc = subprocess.run(
+            ['git', *args],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            timeout=timeout,
+        )
+        return proc.returncode, (proc.stdout or '').strip(), (proc.stderr or '').strip()
+    except Exception as exc:
+        return 1, '', str(exc)
+
+
+def update_from_git():
+    if not (ROOT / '.git').exists():
+        return {'ok': False, 'error': '이 폴더는 Git 저장소가 아닙니다.'}
+
+    code, status_out, status_err = run_git_command(['status', '--porcelain', '--untracked-files=no'], timeout=30)
+    if code != 0:
+        return {'ok': False, 'error': status_err or status_out or 'Git 상태 확인에 실패했습니다.'}
+    if status_out.strip():
+        return {
+            'ok': False,
+            'local_changes': True,
+            'error': '추적 중인 로컬 수정이 있어 자동 업데이트를 중단했습니다.',
+            'details': status_out,
+        }
+
+    _, before, _ = run_git_command(['rev-parse', 'HEAD'], timeout=30)
+    code, pull_out, pull_err = run_git_command(['pull', '--ff-only'], timeout=180)
+    _, after, _ = run_git_command(['rev-parse', 'HEAD'], timeout=30)
+
+    if code != 0:
+        return {
+            'ok': False,
+            'error': pull_err or pull_out or 'git pull에 실패했습니다.',
+            'details': pull_out,
+        }
+
+    changed_files = []
+    if before and after and before != after:
+        _, diff_out, _ = run_git_command(['diff', '--name-only', before, after], timeout=30)
+        changed_files = [line.strip() for line in diff_out.splitlines() if line.strip()]
+
+    server_restart_required = any(
+        path == 'server.py' or path.startswith('scripts/')
+        for path in changed_files
+    )
+    browser_reload_required = any(
+        path == 'dashboard.html'
+        for path in changed_files
+    )
+
+    return {
+        'ok': True,
+        'updated': bool(before and after and before != after),
+        'before': before,
+        'after': after,
+        'changed_files': changed_files,
+        'server_restart_required': server_restart_required,
+        'browser_reload_required': browser_reload_required,
+        'message': pull_out or 'Already up to date.',
+    }
+
+
 def video_browser_roots():
     settings = read_local_settings()
     video_settings = settings.get('video') if isinstance(settings.get('video'), dict) else {}
@@ -2641,6 +2709,9 @@ class CrataHandler(BaseHTTPRequestHandler):
 
         elif path == '/api/calendar/delete':
             self.send_json(delete_calendar_event(data))
+
+        elif path == '/api/system/update':
+            self.send_json(update_from_git())
 
         elif path == '/api/video/edit':
             self.send_json(save_video_edit_action(data))

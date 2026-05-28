@@ -5283,6 +5283,9 @@ body {
         <span id="server-status-dot" class="dot" style="background:var(--text-muted);"></span>
         <span id="server-status-lbl" style="font-size:11px;color:var(--text-muted);">오프라인 모드</span>
       </div>
+      <button class="kpi" id="system-update-btn" onclick="runSystemUpdate()" title="실행 중 GitHub 변경사항을 데스크탑 서버에 가져옵니다." style="cursor:pointer;">
+        <span class="dot dg"></span><span class="v" id="system-update-label" style="font-size:11px;">업데이트</span>
+      </button>
       <div class="kpi" title="현재 관리 대상인 에이전트 스킬 종류"><span class="dot dg"></span><span class="v">6</span><span class="l">스킬</span></div>
       <div class="kpi" title="결과지 문구 전체 커버리지"><span class="dot dy"></span><span class="v" id="kpi-coverage-val">—</span><span class="l">커버리지</span></div>
     </div>
@@ -6478,6 +6481,44 @@ function setServerStatus(connected) {
     dot.style.boxShadow    = 'none';
     lbl.textContent        = '오프라인 모드';
     lbl.style.color        = 'var(--text-muted)';
+  }
+}
+
+async function runSystemUpdate() {
+  const btn = document.getElementById('system-update-btn');
+  const label = document.getElementById('system-update-label');
+  if (!isServerConnected) {
+    showToast('서버 연결 후 업데이트할 수 있습니다.', 'warning');
+    return;
+  }
+  if (btn) btn.disabled = true;
+  if (label) label.textContent = '확인 중';
+  showToast('GitHub 변경사항을 확인합니다.', 'info');
+  try {
+    const result = await postToServer('/api/system/update', {}, 240000);
+    if (!result || !result.ok) {
+      showToast(result?.error || '업데이트 확인에 실패했습니다.', 'warning');
+      return;
+    }
+    if (!result.updated) {
+      showToast('이미 최신 상태입니다.', 'success');
+      return;
+    }
+    const changedCount = Array.isArray(result.changed_files) ? result.changed_files.length : 0;
+    if (result.server_restart_required) {
+      showToast(`업데이트 ${changedCount}개 적용됨. 서버 재시작이 필요합니다.`, 'warning');
+    } else if (result.browser_reload_required) {
+      showToast(`업데이트 ${changedCount}개 적용됨. 화면을 새로고침합니다.`, 'success');
+      setTimeout(() => window.location.reload(), 1200);
+    } else {
+      showToast(`업데이트 ${changedCount}개 적용됨.`, 'success');
+      fetchRealData();
+    }
+  } catch (error) {
+    showToast('업데이트 중 오류가 발생했습니다.', 'warning');
+  } finally {
+    if (btn) btn.disabled = false;
+    if (label) label.textContent = '업데이트';
   }
 }
 
