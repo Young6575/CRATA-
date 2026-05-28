@@ -2858,6 +2858,7 @@ def create_video_encoding_task(data):
 - 이 작업은 시뮬레이션이 아닙니다. 실제 처리 가능한 로컬 파이프라인을 찾아 실행하세요.
 - 우선 repo 안의 .agents/skills/video-encoding/SKILL.md를 읽고 그 절차를 따르세요.
 - 실행 스크립트는 tools/video_agent/subtitle_agent.py를 우선 사용하세요. 아직 이관 전이면 C:\\Users\\wnsdu\\Desktop\\프로젝트\\영상편집에이전트\\subtitle_agent.py를 확인하세요.
+- tools/video_agent/subtitle_agent.py는 전사 세그먼트가 생성될 때마다 raw_transcribe 진행률을 갱신하도록 되어 있으니, 진행률 표시가 필요한 작업에서는 이 내부 스크립트를 우선하세요.
 - ffmpeg, faster-whisper large-v3, pyannote diarization, subtitle burn-in, final encode 관련 실행 가능성을 확인하세요.
 - 실행 가능한 파이프라인이 없으면 임의 완료 처리하지 말고 필요한 스크립트/의존성/명령을 결과에 명확히 보고하세요.
 - 진행 중에는 video_status.json을 갱신하세요. 형식은 status(active|requested|waiting_preview_review|done|error), progress, current_file, batch_progress, total_files, completed_files, current_process, current_process_label, process_status, message, speaker_count 입니다.
