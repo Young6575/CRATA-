@@ -574,6 +574,14 @@ def handle_video_upload(handler):
     if not uploaded:
         return {'ok': False, 'error': '지원하는 영상 파일이 없습니다.'}
 
+    purpose = (parse_qs(urlparse(handler.path).query).get('purpose') or ['edit'])[0]
+    if purpose == 'encoding':
+        return {
+            'ok': True,
+            'uploaded': uploaded,
+            'upload_dir': str(pathlib.Path(uploaded[0]['path']).parent) if uploaded else '',
+        }
+
     queue = save_video_edit_action({
         'action': 'bulk_add',
         'source': 'upload',
