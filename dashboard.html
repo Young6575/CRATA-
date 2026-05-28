@@ -6290,6 +6290,7 @@ body {
         </div>
         <div style="background:#05070a; padding:10px;">
           <video id="video-preview-player" controls preload="metadata" style="width:100%; max-height:70vh; display:block; background:#000; border-radius:var(--radius-sm);"></video>
+          <div id="video-preview-status" style="min-height:18px; margin-top:8px; color:var(--text-muted); font-size:12px; line-height:1.45;">미리보기 요청 대기 중</div>
         </div>
       </div>
     </div>
@@ -11197,7 +11198,18 @@ function videoPathName(path) {
   return value.split(/[\\/]/).filter(Boolean).pop() || '영상 미리보기';
 }
 
-function previewDesktopVideo(path) {
+function setVideoPreviewStatus(message, tone = 'muted') {
+  const statusEl = document.getElementById('video-preview-status');
+  if (!statusEl) return;
+  statusEl.textContent = message;
+  statusEl.style.color = tone === 'error'
+    ? 'var(--red)'
+    : tone === 'success'
+      ? 'var(--green)'
+      : 'var(--text-muted)';
+}
+
+async function previewDesktopVideo(path) {
   const sourcePath = String(path || '').trim();
   if (!sourcePath) {
     showToast('미리보기할 영상 경로가 비어 있습니다.', 'warning');
@@ -11210,12 +11222,42 @@ function previewDesktopVideo(path) {
   if (!modal || !player) return;
   if (title) title.textContent = videoPathName(sourcePath);
   if (pathEl) pathEl.textContent = sourcePath;
+  modal.style.display = 'flex';
+  setVideoPreviewStatus('서버에서 영상 스트림을 확인하는 중입니다.');
   player.pause();
   player.removeAttribute('src');
+  player.onerror = null;
+  player.onloadedmetadata = null;
   player.load();
-  player.src = `${SERVER_URL}/api/video/preview?path=${encodeURIComponent(sourcePath)}`;
-  modal.style.display = 'flex';
-  player.load();
+
+  const previewUrl = `${SERVER_URL}/api/video/preview?path=${encodeURIComponent(sourcePath)}`;
+  try {
+    const probe = await fetchWithTimeout(previewUrl, { headers: { Range: 'bytes=0-1' } }, 10000);
+    if (!probe.ok) {
+      let message = `미리보기 스트림 확인 실패 (${probe.status})`;
+      try {
+        const payload = await probe.json();
+        if (payload?.error) message = payload.error;
+      } catch (_) {}
+      throw new Error(message);
+    }
+
+    player.onerror = () => {
+      setVideoPreviewStatus('서버 스트림은 열렸지만 브라우저가 이 영상 코덱을 재생하지 못했습니다. H.264 MP4로 변환하면 웹 미리보기가 안정적입니다.', 'error');
+      showToast('브라우저에서 재생할 수 없는 영상 형식일 수 있습니다.', 'warning');
+    };
+    player.onloadedmetadata = () => {
+      setVideoPreviewStatus('미리보기 준비 완료. 재생 버튼으로 확인하세요.', 'success');
+    };
+    player.src = previewUrl;
+    player.load();
+  } catch (error) {
+    player.removeAttribute('src');
+    player.load();
+    const message = error.message || '미리보기 스트림을 열지 못했습니다.';
+    setVideoPreviewStatus(message, 'error');
+    showToast(message, 'warning');
+  }
 }
 
 function closeVideoPreview() {
@@ -11226,6 +11268,7 @@ function closeVideoPreview() {
     player.removeAttribute('src');
     player.load();
   }
+  setVideoPreviewStatus('미리보기 요청 대기 중');
   if (modal) modal.style.display = 'none';
 }
 
@@ -11312,7 +11355,7 @@ function chooseVideoPath(path) {
 
 // Real Polling from backend json (if running locally on webserver)
 function pollVideoStatus() {
-  fetch('video_status.json')
+  fetchWithTimeout(`${SERVER_URL}/api/video/status`, {}, 3000)
     .then(response => {
       if (!response.ok) throw new Error('Static Mode');
       return response.json();

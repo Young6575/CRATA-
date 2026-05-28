@@ -6,7 +6,7 @@
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import json, re, glob, pathlib, mimetypes, os, shutil, socket, subprocess, tempfile, threading, time, uuid
 from datetime import datetime, timedelta
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, quote
 
 ROOT = pathlib.Path(__file__).parent
 TASK_LOCK = threading.Lock()
@@ -406,6 +406,30 @@ def make_video_edit_item(source_path, title='', source='manual', status='pending
 def read_video_status():
     data = read_json_file(VIDEO_STATUS_FILE, {})
     return data if isinstance(data, dict) else {}
+
+
+def video_status_payload():
+    status = {
+        'status': 'idle',
+        'progress': 0,
+        'current_file': '',
+        'batch_progress': 0,
+        'total_files': 0,
+        'completed_files': [],
+        'current_step': 0,
+        'updated_at': '',
+    }
+    status.update(read_video_status())
+    return status
+
+
+def inline_content_disposition(filename):
+    raw = str(filename or '')
+    stem = re.sub(r'[^A-Za-z0-9._-]+', '_', pathlib.PurePath(raw).stem).strip('._-') or 'preview'
+    suffix = re.sub(r'[^A-Za-z0-9.]+', '', pathlib.PurePath(raw).suffix)[:16]
+    fallback = f'{stem}{suffix}' if suffix else stem
+    encoded = quote(str(filename or fallback), safe='')
+    return f'inline; filename="{fallback}"; filename*=UTF-8\'\'{encoded}'
 
 
 def load_video_edit_queue_raw():
@@ -2511,13 +2535,15 @@ class CrataHandler(BaseHTTPRequestHandler):
         ts = datetime.now().strftime('%H:%M:%S')
         print(f'[{ts}] {format % args}')
 
-    def send_json(self, data, status=200):
+    def send_json(self, data, status=200, head_only=False):
         body = json.dumps(data, ensure_ascii=False).encode('utf-8')
         self.send_response(status)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Content-Length', len(body))
         self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
+        if head_only:
+            return
         self.wfile.write(body)
 
     def send_json_or_jsonp(self, data, query, status=200):
@@ -2537,9 +2563,23 @@ class CrataHandler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header('Access-Control-Allow-Methods', 'GET, HEAD, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Range')
+        self.send_header('Access-Control-Expose-Headers', 'Accept-Ranges, Content-Length, Content-Range')
         self.end_headers()
+
+    def do_HEAD(self):
+        parsed = urlparse(self.path)
+        path = parsed.path
+        if path == '/api/video/preview':
+            query = parse_qs(parsed.query)
+            preview_path = (query.get('path') or [''])[0]
+            self.stream_video_preview(preview_path, head_only=True)
+        elif path in ('/api/video/status', '/video_status.json'):
+            self.send_json(video_status_payload(), head_only=True)
+        else:
+            self.send_response(404)
+            self.end_headers()
 
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -2572,6 +2612,9 @@ class CrataHandler(BaseHTTPRequestHandler):
             query = parse_qs(parsed.query)
             browse_path = (query.get('path') or [''])[0]
             self.send_json_or_jsonp(browse_video_files(browse_path), parsed.query)
+
+        elif path in ('/api/video/status', '/video_status.json'):
+            self.send_json_or_jsonp(video_status_payload(), parsed.query)
 
         elif path == '/api/video/preview':
             query = parse_qs(parsed.query)
@@ -2621,10 +2664,10 @@ class CrataHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-    def stream_video_preview(self, raw_path):
+    def stream_video_preview(self, raw_path, head_only=False):
         fpath, error = resolve_video_preview_path(raw_path)
         if error:
-            self.send_json({'ok': False, 'error': error}, 404)
+            self.send_json({'ok': False, 'error': error}, 404, head_only=head_only)
             return
 
         file_size = fpath.stat().st_size
@@ -2653,11 +2696,15 @@ class CrataHandler(BaseHTTPRequestHandler):
         self.send_header('Content-Type', mime or 'video/mp4')
         self.send_header('Accept-Ranges', 'bytes')
         self.send_header('Content-Length', str(length))
-        self.send_header('Content-Disposition', f'inline; filename="{fpath.name}"')
+        self.send_header('Content-Disposition', inline_content_disposition(fpath.name))
         self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Expose-Headers', 'Accept-Ranges, Content-Length, Content-Range')
         if status == 206:
             self.send_header('Content-Range', f'bytes {start}-{end}/{file_size}')
         self.end_headers()
+
+        if head_only:
+            return
 
         try:
             with fpath.open('rb') as src:
