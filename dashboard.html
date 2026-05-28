@@ -6386,7 +6386,9 @@ let selectedCmdIndex = 0;
 window.gPressed = false;
 
 // ── 서버 연결 설정 ──────────────────────────────────────────────────
-const SERVER_URL = 'http://localhost:8765';
+const SERVER_URL = window.location.protocol === 'file:'
+  ? 'http://localhost:8765'
+  : window.location.origin;
 let isServerConnected = false;
 
 function setServerStatus(connected) {
