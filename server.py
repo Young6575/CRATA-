@@ -153,6 +153,47 @@ def run_git_command(args, timeout=120):
         return 1, '', str(exc)
 
 
+def git_untracked_files():
+    code, out, _ = run_git_command(['ls-files', '--others', '--exclude-standard'], timeout=30)
+    if code != 0:
+        return []
+    return [line.strip().replace('\\', '/') for line in out.splitlines() if line.strip()]
+
+
+def git_upstream_ref():
+    code, out, _ = run_git_command(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'], timeout=30)
+    return out.strip() if code == 0 else ''
+
+
+def git_incoming_files(upstream):
+    if not upstream:
+        return []
+    code, out, _ = run_git_command(['diff', '--name-only', f'HEAD..{upstream}'], timeout=30)
+    if code != 0:
+        return []
+    return [line.strip().replace('\\', '/') for line in out.splitlines() if line.strip()]
+
+
+def backup_untracked_incoming_files(incoming_files):
+    untracked = set(git_untracked_files())
+    conflicts = [path for path in incoming_files if path in untracked]
+    if not conflicts:
+        return []
+
+    stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    backup_root = ROOT / '처리관리' / 'backups' / 'untracked-update' / stamp
+    backups = []
+    for rel in conflicts:
+        source = ROOT / rel
+        if not source.is_file():
+            continue
+        dest = backup_root / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(source), str(dest))
+        backups.append({'path': rel, 'backup': str(dest.relative_to(ROOT))})
+    return backups
+
+
 def update_from_git():
     if not (ROOT / '.git').exists():
         return {'ok': False, 'error': '이 폴더는 Git 저장소가 아닙니다.'}
@@ -162,6 +203,11 @@ def update_from_git():
         return {'ok': False, 'error': status_err or status_out or 'Git 상태 확인에 실패했습니다.'}
 
     _, before, _ = run_git_command(['rev-parse', 'HEAD'], timeout=30)
+    fetch_code, fetch_out, fetch_err = run_git_command(['fetch'], timeout=180)
+    if fetch_code != 0:
+        return {'ok': False, 'error': fetch_err or fetch_out or 'GitHub 변경사항 확인에 실패했습니다.'}
+    upstream = git_upstream_ref()
+    auto_backups = backup_untracked_incoming_files(git_incoming_files(upstream))
     local_changes = [line.strip() for line in status_out.splitlines() if line.strip()]
     pull_args = ['pull', '--ff-only']
     if local_changes:
@@ -183,6 +229,7 @@ def update_from_git():
             'details': pull_out,
             'local_changes': bool(local_changes),
             'local_change_files': local_changes,
+            'untracked_backups': auto_backups,
         }
 
     changed_files = []
@@ -207,6 +254,7 @@ def update_from_git():
         'changed_files': changed_files,
         'local_changes_autostashed': bool(local_changes),
         'local_change_files': local_changes,
+        'untracked_backups': auto_backups,
         'server_restart_required': server_restart_required,
         'browser_reload_required': browser_reload_required,
         'message': pull_out or 'Already up to date.',

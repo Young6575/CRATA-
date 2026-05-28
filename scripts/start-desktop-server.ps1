@@ -15,6 +15,26 @@ if (-not $SkipPull -and (Test-Path ".git")) {
     if ($LASTEXITCODE -ne 0) {
         Write-Warning "Git status check failed. Starting server without pull."
     } else {
+        git fetch
+        if ($LASTEXITCODE -eq 0) {
+            $upstream = git rev-parse --abbrev-ref --symbolic-full-name "@{u}" 2>$null
+            if ($LASTEXITCODE -eq 0 -and $upstream) {
+                $incoming = @(git diff --name-only "HEAD..$upstream" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+                $untracked = @(git ls-files --others --exclude-standard | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+                $conflicts = @($incoming | Where-Object { $untracked -contains $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) })
+                if ($conflicts.Count -gt 0) {
+                    $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
+                    $backupRoot = Join-Path $repoRoot "처리관리\backups\untracked-update\$stamp"
+                    foreach ($rel in $conflicts) {
+                        $source = Join-Path $repoRoot $rel
+                        $dest = Join-Path $backupRoot $rel
+                        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dest) | Out-Null
+                        Move-Item -LiteralPath $source -Destination $dest -Force
+                        Write-Warning "Untracked file backed up before pull: $rel -> $dest"
+                    }
+                }
+            }
+        }
         if ($trackedChanges) {
             Write-Host "Tracked local changes found. Pulling with autostash..."
             git pull --ff-only --autostash
