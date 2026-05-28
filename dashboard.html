@@ -5216,9 +5216,10 @@ button.nav-item.active {
 
 .video-transcript-row {
   display: grid;
-  grid-template-columns: 112px minmax(0, 1fr);
-  gap: 14px;
-  padding: 11px 12px;
+  grid-template-columns: minmax(170px, 220px) 82px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
   border-bottom: 1px solid rgba(148,163,184,0.10);
 }
 
@@ -5232,6 +5233,22 @@ button.nav-item.active {
   font-size: 12px;
   font-weight: 800;
   line-height: 1.55;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.video-transcript-speaker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--accent-rgb),0.30);
+  background: rgba(var(--accent-rgb),0.10);
+  color: #dbeafe;
+  font-size: 11.5px;
+  font-weight: 850;
   white-space: nowrap;
 }
 
@@ -5345,6 +5362,14 @@ button.nav-item.active {
   }
   .video-final-transcript-search {
     width: min(100%, 260px);
+  }
+  .video-transcript-row {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+  .video-transcript-speaker {
+    justify-content: flex-start;
+    width: fit-content;
   }
 }
 
@@ -11767,6 +11792,8 @@ let selectedVideoArtifact = { stepId: '', path: '', title: '', content: '', load
 let finalTranscriptState = {
   artifact: null,
   content: '',
+  speakerContent: '',
+  speakerPath: '',
   loading: false,
   error: '',
   truncated: false,
@@ -11910,6 +11937,35 @@ function finalTranscriptCandidateScore(item, stepId) {
   return score;
 }
 
+function finalTranscriptCompanionSpeakerPaths(path) {
+  const raw = String(path || '').trim();
+  if (!raw) return [];
+  const normalized = raw.replace(/\\/g, '/');
+  const slash = normalized.lastIndexOf('/');
+  const dir = slash >= 0 ? normalized.slice(0, slash + 1) : '';
+  const file = slash >= 0 ? normalized.slice(slash + 1) : normalized;
+  const stem = file.replace(/\.[^.]+$/, '');
+  const baseStems = [
+    stem,
+    stem.replace(/_(final_reviewed|speaker_reviewed|reviewed|term_correction|quality_review|review|colored)$/i, ''),
+  ].filter(Boolean);
+  const candidates = [];
+  baseStems.forEach(base => {
+    [
+      `${base}_speaker_reviewed.srt`,
+      `${base}_final_reviewed.srt`,
+      `${base}.ass`,
+      `${base}_reviewed.ass`,
+      `${base}_colored.srt`,
+      `${base}_reviewed.srt`,
+    ].forEach(name => {
+      const candidate = `${dir}${name}`;
+      if (candidate && candidate !== normalized && !candidates.includes(candidate)) candidates.push(candidate);
+    });
+  });
+  return candidates;
+}
+
 function pickFinalTranscriptArtifact(data) {
   const priority = ['speaker_review', 'crata_term_correction', 'diarize', 'raw_transcribe'];
   const candidates = [];
@@ -11929,16 +11985,45 @@ function pickFinalTranscriptArtifact(data) {
   return candidates[0] || null;
 }
 
-function stripSubtitleSpeakerAndFormat(text) {
+function normalizeTranscriptSpeaker(raw) {
+  const value = String(raw || '').trim();
+  if (!value) return '';
+  const upper = value.toUpperCase().replace(/\s+/g, '_');
+  const m = upper.match(/SPEAKER[_-]?(\d+)/);
+  if (m) return `화자 ${Number(m[1]) + 1}`;
+  const korean = value.match(/화자\s*(\d+)/);
+  if (korean) return `화자 ${Number(korean[1])}`;
+  if (/강사/.test(value)) return '강사';
+  if (/질문자/.test(value)) return '질문자';
+  if (/진행자|사회자/.test(value)) return value.replace(/\s+/g, '');
+  return value.length > 16 ? value.slice(0, 16) : value;
+}
+
+function basicSubtitleTextCleanup(text) {
   return String(text || '')
     .replace(/\{[^}]*\}/g, '')
     .replace(/\\N|\\n/g, ' ')
     .replace(/\\h/g, ' ')
     .replace(/<[^>]+>/g, '')
-    .replace(/^\s*\[(?:강사|질문자|진행자|사회자|SPEAKER[_\s-]*\d+|Speaker\s*\d+)\]\s*/i, '')
-    .replace(/^\s*(?:강사|질문자|진행자|사회자|SPEAKER[_\s-]*\d+|Speaker\s*\d+)\s*[:：]\s*/i, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function transcriptSpeakerAndText(text, fallbackSpeaker = '') {
+  let cleaned = basicSubtitleTextCleanup(text);
+  let speaker = normalizeTranscriptSpeaker(fallbackSpeaker);
+  const bracket = cleaned.match(/^\s*\[((?:강사|질문자|진행자|사회자|화자\s*\d+|SPEAKER[_\s-]*\d+|Speaker\s*\d+))\]\s*(.*)$/i);
+  const colon = cleaned.match(/^\s*((?:강사|질문자|진행자|사회자|화자\s*\d+|SPEAKER[_\s-]*\d+|Speaker\s*\d+))\s*[:：]\s*(.*)$/i);
+  const match = bracket || colon;
+  if (match) {
+    speaker = normalizeTranscriptSpeaker(match[1]) || speaker;
+    cleaned = basicSubtitleTextCleanup(match[2]);
+  }
+  return { speaker, text: cleaned };
+}
+
+function stripSubtitleSpeakerAndFormat(text) {
+  return transcriptSpeakerAndText(text).text;
 }
 
 function parseTranscriptSegments(content, path) {
@@ -11953,8 +12038,8 @@ function parseTranscriptSegments(content, path) {
       const parts = payload.split(',');
       const start = parts[1] || '';
       const end = parts[2] || '';
-      const body = stripSubtitleSpeakerAndFormat(parts.slice(9).join(','));
-      if (body) segments.push({ time: [start, end].filter(Boolean).join(' → '), text: body });
+      const parsed = transcriptSpeakerAndText(parts.slice(9).join(','), parts[4] || '');
+      if (parsed.text) segments.push({ time: [start, end].filter(Boolean).join(' → '), text: parsed.text, speaker: parsed.speaker });
     });
     if (segments.length) return segments;
   }
@@ -11965,16 +12050,39 @@ function parseTranscriptSegments(content, path) {
     const timeIndex = lines.findIndex(line => /\d{1,2}:\d{2}:\d{2}[,.]\d{1,3}\s*-->\s*\d{1,2}:\d{2}:\d{2}[,.]\d{1,3}/.test(line));
     if (timeIndex >= 0) {
       const time = lines[timeIndex].replace(/,/g, '.');
-      const body = stripSubtitleSpeakerAndFormat(lines.slice(timeIndex + 1).join(' '));
-      if (body) segments.push({ time, text: body });
+      const parsed = transcriptSpeakerAndText(lines.slice(timeIndex + 1).join(' '));
+      if (parsed.text) segments.push({ time, text: parsed.text, speaker: parsed.speaker });
     } else if (ext === 'md' || ext === 'txt') {
-      const body = stripSubtitleSpeakerAndFormat(lines.join(' '));
-      if (body) segments.push({ time: `#${index + 1}`, text: body });
+      const parsed = transcriptSpeakerAndText(lines.join(' '));
+      if (parsed.text) segments.push({ time: `#${index + 1}`, text: parsed.text, speaker: parsed.speaker });
     }
   });
 
   if (segments.length) return segments;
-  return text.split('\n').map(line => stripSubtitleSpeakerAndFormat(line)).filter(Boolean).map((line, index) => ({ time: `#${index + 1}`, text: line }));
+  return text.split('\n')
+    .map(line => transcriptSpeakerAndText(line))
+    .filter(item => item.text)
+    .map((item, index) => ({ time: `#${index + 1}`, text: item.text, speaker: item.speaker }));
+}
+
+function transcriptStartKey(time) {
+  const match = String(time || '').match(/\d{1,2}:\d{2}:\d{2}[.,]\d{1,3}/);
+  return match ? match[0].replace(',', '.').replace(/^0(?=\d:)/, '') : '';
+}
+
+function mergeTranscriptSpeakerRows(rows, speakerRows) {
+  const source = Array.isArray(speakerRows) ? speakerRows.filter(row => row.speaker) : [];
+  if (!source.length) return rows;
+  const byTime = new Map();
+  source.forEach((row, index) => {
+    const key = transcriptStartKey(row.time);
+    if (key && !byTime.has(key)) byTime.set(key, row.speaker);
+    if (!byTime.has(`idx:${index}`)) byTime.set(`idx:${index}`, row.speaker);
+  });
+  return rows.map((row, index) => ({
+    ...row,
+    speaker: row.speaker || byTime.get(transcriptStartKey(row.time)) || byTime.get(`idx:${index}`) || '',
+  }));
 }
 
 function setFinalTranscriptSearch(value) {
@@ -11994,6 +12102,8 @@ async function loadFinalTranscriptArtifact(artifact) {
   const targetPath = artifact.path;
   finalTranscriptState.loading = true;
   finalTranscriptState.error = '';
+  finalTranscriptState.speakerContent = '';
+  finalTranscriptState.speakerPath = '';
   renderFinalTranscriptReview(latestVideoStatusData);
   try {
     const res = await fetchWithTimeout(`${SERVER_URL}/api/video/artifact?path=${encodeURIComponent(targetPath)}`, {}, 12000);
@@ -12004,6 +12114,7 @@ async function loadFinalTranscriptArtifact(artifact) {
     finalTranscriptState.loading = false;
     finalTranscriptState.error = '';
     finalTranscriptState.truncated = !!data.truncated;
+    await loadFinalTranscriptSpeakerCompanion(artifact);
   } catch (error) {
     if (finalTranscriptState.artifact?.path !== targetPath) return;
     finalTranscriptState.content = '';
@@ -12012,6 +12123,27 @@ async function loadFinalTranscriptArtifact(artifact) {
     finalTranscriptState.truncated = false;
   }
   renderFinalTranscriptReview(latestVideoStatusData);
+}
+
+async function loadFinalTranscriptSpeakerCompanion(artifact) {
+  const targetPath = artifact?.path || '';
+  const directRows = parseTranscriptSegments(finalTranscriptState.content, targetPath);
+  if (directRows.some(row => row.speaker)) return;
+  const explicit = [artifact?.speakerPath, artifact?.speaker_path, artifact?.diarizedPath, artifact?.diarized_path].filter(Boolean);
+  const candidates = [...explicit, ...finalTranscriptCompanionSpeakerPaths(targetPath)];
+  for (const candidate of candidates) {
+    try {
+      const res = await fetchWithTimeout(`${SERVER_URL}/api/video/artifact?path=${encodeURIComponent(candidate)}`, {}, 3500);
+      const data = await res.json();
+      if (!res.ok || !data.ok || !data.content) continue;
+      const rows = parseTranscriptSegments(data.content, candidate);
+      if (!rows.some(row => row.speaker)) continue;
+      if (finalTranscriptState.artifact?.path !== targetPath) return;
+      finalTranscriptState.speakerContent = data.content;
+      finalTranscriptState.speakerPath = candidate;
+      return;
+    } catch (_) {}
+  }
 }
 
 function reloadFinalTranscriptArtifact() {
@@ -12074,9 +12206,13 @@ function renderFinalTranscriptRows() {
 
   const query = finalTranscriptState.query.toLowerCase();
   let rows = parseTranscriptSegments(finalTranscriptState.content, artifact.path);
+  const speakerRows = finalTranscriptState.speakerContent
+    ? parseTranscriptSegments(finalTranscriptState.speakerContent, finalTranscriptState.speakerPath)
+    : [];
+  rows = mergeTranscriptSpeakerRows(rows, speakerRows);
   const totalRows = rows.length;
   if (query) {
-    rows = rows.filter(row => `${row.time} ${row.text}`.toLowerCase().includes(query));
+    rows = rows.filter(row => `${row.time} ${row.speaker || ''} ${row.text}`.toLowerCase().includes(query));
   }
   const shownRows = rows.slice(0, 1800);
   const fontSize = Math.max(14, Math.min(24, finalTranscriptState.fontSize || 16));
@@ -12088,6 +12224,7 @@ function renderFinalTranscriptRows() {
     ${shownRows.map(row => `
       <div class="video-transcript-row">
         <div class="video-transcript-time">${escapeHtml(row.time || '')}</div>
+        <div class="video-transcript-speaker">${escapeHtml(row.speaker || '화자 미분류')}</div>
         <div class="video-transcript-text" style="font-size:${fontSize}px;">${escapeHtml(row.text || '')}</div>
       </div>
     `).join('')}

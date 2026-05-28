@@ -731,6 +731,15 @@ def get_speaker_style(speaker_id: str) -> dict:
     return SPEAKER_STYLES.get(speaker_id, DEFAULT_STYLE)
 
 
+def speaker_review_label(speaker_id: str) -> str:
+    style = get_speaker_style(speaker_id)
+    name = str(style.get("name") or "").strip()
+    if name:
+        return name
+    m = re.search(r"(\d+)$", str(speaker_id or ""))
+    return f"화자{int(m.group(1)) + 1}" if m else "화자"
+
+
 def create_ass_file(segments: list[dict], output_path: Path,
                     video_width=3840, video_height=2160):
     style = load_subtitle_style()
@@ -765,9 +774,10 @@ def create_ass_file(segments: list[dict], output_path: Path,
     lines = [header]
     for seg in segments:
         text = clean_visible_subtitle_text(seg["text"]).replace("\n", "\\N")
+        speaker_name = speaker_review_label(seg.get("speaker", ""))
         lines.append(
             f"Dialogue: 0,{format_ass_time(seg['start'])},{format_ass_time(seg['end'])},"
-            f"{style_name},,0,0,0,,{text}"
+            f"{style_name},{speaker_name},0,0,0,,{text}"
         )
     output_path.write_text("\n".join(lines), encoding="utf-8")
 
@@ -776,8 +786,10 @@ def create_colored_srt(segments: list[dict], output_path: Path):
     lines = []
     for i, seg in enumerate(segments, 1):
         text = clean_visible_subtitle_text(seg["text"])
+        speaker_name = speaker_review_label(seg.get("speaker", ""))
+        review_text = f"[{speaker_name}] {text}" if speaker_name else text
         lines.append(
-            f"{i}\n{format_srt_time(seg['start'])} --> {format_srt_time(seg['end'])}\n{text}\n"
+            f"{i}\n{format_srt_time(seg['start'])} --> {format_srt_time(seg['end'])}\n{review_text}\n"
         )
     output_path.write_text("\n".join(lines), encoding="utf-8")
 
