@@ -174,6 +174,16 @@ def update_process_progress(process_id: str, pct: int | float, message: str = ""
     })
 
 
+def add_process_result(process_id: str, result: dict):
+    process_results = _status_data.get("process_results") if isinstance(_status_data.get("process_results"), dict) else {}
+    items = process_results.get(process_id) if isinstance(process_results.get(process_id), list) else []
+    target_path = str(result.get("path") or "").lower()
+    if not any(str(item.get("path") or "").lower() == target_path for item in items if isinstance(item, dict)):
+        items.append(result)
+    process_results[process_id] = items
+    write_status({"process_results": process_results})
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -479,6 +489,27 @@ def review_srt(srt_path: Path) -> dict:
     return {"segments": len(segs), "duration": total_duration, "issues": issues}
 
 
+def write_review_report(srt_path: Path, result: dict) -> Path:
+    report_path = srt_path.with_name(srt_path.stem + "_review.md")
+    issue_lines = result.get("issues") or []
+    lines = [
+        f"# 전사 품질검토: {srt_path.name}",
+        "",
+        f"- 자막 수: {result.get('segments', 0)}개",
+        f"- 길이: {str(timedelta(seconds=int(result.get('duration', 0))))}",
+        f"- 이슈: {len(issue_lines)}건",
+        "",
+        "## 검토 결과",
+        "",
+    ]
+    if issue_lines:
+        lines.extend(f"- {issue.strip()}" for issue in issue_lines)
+    else:
+        lines.append("- 품질검토 기준에서 발견된 자동 이슈가 없습니다.")
+    report_path.write_text("\n".join(lines), encoding="utf-8")
+    return report_path
+
+
 def cmd_review():
     videos = collect_videos()
     has_srt = [v for v in videos if v["has_srt"]]
@@ -491,9 +522,13 @@ def cmd_review():
     print(f"{'='*70}\n")
 
     total_issues = 0
-    for item in has_srt:
+    init_status("review", len(has_srt))
+    completed_names = []
+    for i, item in enumerate(has_srt, 1):
         srt = item["srt"]
         label = f"{srt.parent.name}/{srt.name}"
+        write_status({"done": i - 1, "current_file": label, "completed": completed_names})
+        update_process_progress("transcript_quality_review", int((i - 1) / len(has_srt) * 100), f"전사 품질검토 중 · {label}")
         result = review_srt(srt)
 
         if "error" in result:
@@ -510,10 +545,21 @@ def cmd_review():
         for issue in result["issues"]:
             print(f"  {issue}")
         print()
+        report = write_review_report(srt, result)
+        completed_names.append(label)
+        add_process_result("transcript_quality_review", {
+            "title": "전사 품질검토 리포트",
+            "path": str(report),
+            "kind": "품질검토",
+            "viewer": "review",
+            "summary": status,
+        })
 
     print(f"{'='*70}")
     print(f"  총 이슈: {total_issues}건")
     print(f"{'='*70}\n")
+    update_process_progress("transcript_quality_review", 100, f"전사 품질검토 완료 · 총 이슈 {total_issues}건", state="done")
+    write_status({"completed": completed_names, "completed_files": completed_names})
 
 
 # ── diarize 명령어 ─────────────────────────────────────────────────────────────
@@ -668,6 +714,8 @@ def cmd_diarize(yes: bool = False):
         print("취소됨.")
         return
 
+    init_status("diarize", len(ready))
+    completed_names = []
     for i, item in enumerate(ready, 1):
         video   = item["video"]
         srt     = item["srt"]
@@ -675,20 +723,25 @@ def cmd_diarize(yes: bool = False):
         colored = srt.with_name(srt.stem + "_colored.srt")
 
         print(f"\n[{i}/{len(ready)}] {video.parent.name}/{video.name}")
+        label = f"{video.parent.name}/{video.name}"
+        write_status({"done": i - 1, "current_file": label, "completed": completed_names})
 
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             tmp_audio = Path(tmp.name)
 
         try:
             print("  → 오디오 추출 중...", end=" ", flush=True)
+            update_process_progress("diarize", 5, "화자분리용 오디오 추출 중")
             extract_audio(video, tmp_audio)
             print("완료")
 
             print("  → 화자분리 중 (pyannote.audio)...", flush=True)
+            update_process_progress("diarize", 20, "pyannote 화자분리 중")
             diar_segs = run_diarization(tmp_audio, token)
             print(f"  완료 ({len(diar_segs)}개 구간)")
 
             print("  → SRT 자막과 병합 중...", end=" ", flush=True)
+            update_process_progress("diarize", 82, "화자 라벨과 전사 세그먼트 병합 중")
             srt_segs = read_srt(srt)
             tagged   = normalize_speakers(assign_speakers(srt_segs, diar_segs))
 
@@ -705,6 +758,21 @@ def cmd_diarize(yes: bool = False):
             print(f"  → ASS 저장: {ass_out.name}")
             create_colored_srt(tagged, colored)
             print(f"  → SRT 저장: {colored.name}")
+            completed_names.append(label)
+            add_process_result("diarize", {
+                "title": "화자분리 ASS 자막",
+                "path": str(ass_out),
+                "kind": "화자분리",
+                "viewer": "diarized",
+                "note": summary,
+            })
+            add_process_result("diarize", {
+                "title": "화자분리 색상 SRT",
+                "path": str(colored),
+                "kind": "화자분리",
+                "viewer": "diarized",
+                "note": summary,
+            })
 
         except Exception as e:
             print(f"\n  [오류] {e}\n")
@@ -712,6 +780,8 @@ def cmd_diarize(yes: bool = False):
             tmp_audio.unlink(missing_ok=True)
 
     print("\n3단계 완료. → 'python subtitle_agent.py final'")
+    update_process_progress("diarize", 100, "화자분리 완료", state="done")
+    write_status({"completed": completed_names, "completed_files": completed_names})
 
 
 # ── photo overlay ──────────────────────────────────────────────────────────────
@@ -993,6 +1063,12 @@ def cmd_transcribe():
 
             srt.write_text(srt_content, encoding="utf-8")
             completed_names.append(label)
+            add_process_result("raw_transcribe", {
+                "title": "원본 전사록",
+                "path": str(srt),
+                "kind": "전사록",
+                "viewer": "transcript",
+            })
             update_process_progress("raw_transcribe", 100, "원본 전사 완료", state="done")
             write_status({"completed": completed_names, "completed_files": completed_names})
             print(f"  → SRT 저장: {srt.name}\n")

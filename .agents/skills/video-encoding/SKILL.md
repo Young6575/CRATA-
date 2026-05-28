@@ -147,6 +147,35 @@ H:\Q&A 강의 영상\subtitle_agent.py
 각 단계 상태는 `process_status.<id>.status`에 `pending`, `active`, `waiting`, `done`, `error` 중 하나로 기록한다.
 미리보기 확인 대기 중에는 `status: "waiting_preview_review"`와 `current_process: "subtitle_preview_review"`를 같이 기록한다.
 각 단계의 산출물은 `process_results.<id>`에 `{ "title": "...", "path": "...", "note": "..." }` 형태로 기록한다.
+전사·화자분리·품질검토·용어 교정 결과는 사용자가 대시보드에서 바로 열어볼 수 있어야 한다. 텍스트 산출물에는 `viewer`를 함께 남긴다.
+
+```json
+{
+  "process_results": {
+    "raw_transcribe": [
+      { "title": "원본 전사록", "path": "H:/Q&A/sample.srt", "kind": "전사록", "viewer": "transcript" }
+    ],
+    "diarize": [
+      { "title": "화자분리 ASS 자막", "path": "H:/Q&A/sample.ass", "kind": "화자분리", "viewer": "diarized" }
+    ],
+    "transcript_quality_review": [
+      { "title": "전사 품질검토 리포트", "path": "H:/Q&A/sample_review.md", "kind": "품질검토", "viewer": "review" }
+    ],
+    "crata_term_correction": [
+      {
+        "title": "CRATA 용어 교정",
+        "path": "H:/Q&A/sample_term_correction.md",
+        "kind": "용어 교정",
+        "viewer": "changes",
+        "changes": [
+          { "before": "기존 문장", "after": "변경 문장", "reason": "CRATA 공식 용어 기준", "segment": "00:01:23" }
+        ]
+      }
+    ]
+  }
+}
+```
+
 GPU 모델 다운로드가 진행되면 `model_download.status`를 `downloading`, `progress`를 0-100으로 갱신하고, 완료 후 `completed`로 바꾼다.
 
 ## Expected Outputs

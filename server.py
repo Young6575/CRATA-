@@ -24,6 +24,8 @@ VIDEO_EXTENSIONS = {'.mp4', '.mov', '.mkv', '.avi', '.webm', '.m4v', '.mts', '.m
 VIDEO_EDIT_QUEUE_FILE = ROOT / '처리관리' / 'video_edit_queue.json'
 VIDEO_STATUS_FILE = ROOT / 'video_status.json'
 VIDEO_SYSTEM_CACHE = {'at': 0, 'data': {}}
+VIDEO_TEXT_ARTIFACT_EXTENSIONS = {'.srt', '.ass', '.vtt', '.txt', '.md', '.json', '.csv', '.log'}
+VIDEO_ARTIFACT_MAX_BYTES = 700000
 VIDEO_PROCESS_STEPS = [
     {'id': 'raw_transcribe', 'label': '원본 전사', 'desc': 'large-v3로 원본 SRT/전사본 생성'},
     {'id': 'diarize', 'label': '화자분리', 'desc': '입력한 화자 수 기준으로 화자 라벨 부여'},
@@ -689,6 +691,96 @@ def video_status_refers_to_same_source(base, candidate):
     return any(name and name in candidate_text for name in base_names) or any(name and name in base_text for name in candidate_names)
 
 
+def video_result_entry(title, path, process, kind='', viewer='', **extra):
+    item = {
+        'title': title,
+        'path': str(path),
+        'process': process,
+        'kind': kind or title,
+        'viewer': viewer or 'file',
+    }
+    item.update({k: v for k, v in extra.items() if v not in (None, '')})
+    return item
+
+
+def normalize_process_results(value):
+    return value if isinstance(value, dict) else {}
+
+
+def add_process_result_entry(process_results, process_id, entry):
+    if not entry or not entry.get('path'):
+        return
+    items = process_results.get(process_id)
+    if not isinstance(items, list):
+        items = [items] if items else []
+    target_path = str(entry.get('path') or '').lower()
+    if not any(str((item or {}).get('path') if isinstance(item, dict) else item).lower() == target_path for item in items):
+        items.append(entry)
+    process_results[process_id] = items
+
+
+def video_source_paths_from_status(status):
+    raw_paths = []
+    for key in ('source_path', 'videoSourcePath', 'current_file'):
+        value = str(status.get(key) or '').strip()
+        if value:
+            raw_paths.append(value)
+    for key in ('completed_files', 'completed'):
+        values = status.get(key)
+        if isinstance(values, list):
+            raw_paths.extend(str(value or '').strip() for value in values if value)
+
+    paths = []
+    seen = set()
+    for raw in raw_paths:
+        raw = raw.replace('/', os.sep)
+        fpath = pathlib.Path(raw)
+        if not fpath.is_absolute():
+            continue
+        if fpath.is_dir():
+            try:
+                candidates, _ = collect_video_source_files(str(fpath))
+            except Exception:
+                candidates = []
+            for candidate in candidates[:20]:
+                key = str(candidate).lower()
+                if key not in seen:
+                    seen.add(key)
+                    paths.append(candidate)
+            continue
+        if fpath.suffix.lower() in VIDEO_EXTENSIONS:
+            key = str(fpath).lower()
+            if key not in seen:
+                seen.add(key)
+                paths.append(fpath)
+    return paths
+
+
+def enrich_video_process_results(status):
+    process_results = normalize_process_results(status.get('process_results'))
+    for video in video_source_paths_from_status(status):
+        stem = video.stem
+        folder = video.parent
+        sidecars = [
+            ('raw_transcribe', '원본 전사록', video.with_suffix('.srt'), 'transcript', 'transcript'),
+            ('diarize', '화자분리 ASS 자막', video.with_suffix('.ass'), 'speaker subtitle', 'diarized'),
+            ('diarize', '화자분리 색상 SRT', folder / f'{stem}_colored.srt', 'speaker subtitle', 'diarized'),
+            ('transcript_quality_review', '전사 품질검토 리포트', folder / f'{stem}_review.md', 'quality review', 'review'),
+            ('transcript_quality_review', '전사 품질검토 리포트', folder / f'{stem}_quality_review.md', 'quality review', 'review'),
+            ('crata_term_correction', 'CRATA 용어 교정 리포트', folder / f'{stem}_term_correction.md', 'term correction', 'changes'),
+            ('crata_term_correction', 'CRATA 용어 교정본', folder / f'{stem}_reviewed.srt', 'corrected transcript', 'transcript'),
+            ('speaker_review', '화자분리 검토 리포트', folder / f'{stem}_speaker_review.md', 'speaker review', 'review'),
+            ('subtitle_preview_review', '자막 미리보기', folder / f'{stem}_preview.mp4', 'preview', 'video'),
+            ('burnin', '자막 하드코딩 결과', folder / f'{stem}_sub.mp4', 'burned video', 'video'),
+            ('final_encode', '최종 인코딩 결과', folder / f'{stem}_final.mp4', 'final video', 'video'),
+        ]
+        for process_id, title, artifact, kind, viewer in sidecars:
+            if artifact.exists():
+                add_process_result_entry(process_results, process_id, video_result_entry(title, artifact, process_id, kind, viewer))
+    status['process_results'] = process_results
+    return status
+
+
 def read_video_status():
     base = read_json_file(VIDEO_STATUS_FILE, {})
     base = base if isinstance(base, dict) else {}
@@ -938,6 +1030,7 @@ def video_status_payload():
             pct = 0
         status['status'] = 'done' if pct >= 100 else 'active'
     status['current_process'] = infer_current_video_process(status)
+    enrich_video_process_results(status)
     status['system_metrics'] = collect_system_metrics()
     return status
 
@@ -949,6 +1042,50 @@ def inline_content_disposition(filename):
     fallback = f'{stem}{suffix}' if suffix else stem
     encoded = quote(str(filename or fallback), safe='')
     return f'inline; filename="{fallback}"; filename*=UTF-8\'\'{encoded}'
+
+
+def read_video_artifact(raw_path):
+    raw = str(raw_path or '').strip()
+    if not raw:
+        return {'ok': False, 'error': '결과 파일 경로가 없습니다.'}
+    fpath = pathlib.Path(raw)
+    if not fpath.is_absolute():
+        fpath = ROOT / raw
+    try:
+        fpath = fpath.resolve()
+    except Exception:
+        pass
+    if not fpath.is_file():
+        return {'ok': False, 'error': '결과 파일을 찾지 못했습니다.', 'path': str(fpath)}
+
+    ext = fpath.suffix.lower()
+    size = fpath.stat().st_size
+    if ext not in VIDEO_TEXT_ARTIFACT_EXTENSIONS:
+        return {
+            'ok': True,
+            'path': str(fpath),
+            'name': fpath.name,
+            'extension': ext,
+            'size': size,
+            'text': False,
+            'content': '',
+            'message': '영상 파일은 미리보기 버튼으로 확인하세요.',
+        }
+
+    read_bytes = min(size, VIDEO_ARTIFACT_MAX_BYTES)
+    with fpath.open('rb') as src:
+        blob = src.read(read_bytes)
+    content = blob.decode('utf-8-sig', errors='replace')
+    return {
+        'ok': True,
+        'path': str(fpath),
+        'name': fpath.name,
+        'extension': ext,
+        'size': size,
+        'text': True,
+        'truncated': size > read_bytes,
+        'content': content,
+    }
 
 
 def load_video_edit_queue_raw():
@@ -2915,6 +3052,7 @@ def create_video_encoding_task(data):
 - 모델 다운로드 중에는 model_download.name, model_download.status, model_download.progress를 갱신하세요.
 - 현재 사용 중인 모델은 model_status.active_model, model_status.device, model_status.compute, model_status.task로 남기세요.
 - 각 프로세스 산출물은 process_results.<process_id> 또는 artifacts에 파일 경로와 설명을 남기세요. 대시보드에서 프로세스를 클릭하면 이 값들이 표시됩니다.
+- process_results에는 가능한 한 아래 형태를 사용하세요: {{"title":"원본 전사록","path":"...srt","kind":"전사록","viewer":"transcript"}}. CRATA 용어 교정이나 품질검토처럼 수정 내역이 있는 단계는 changes 배열에 {{"before":"기존 문장","after":"변경 문장","reason":"근거","segment":"00:01:23"}} 형태로 남기세요. 대시보드는 이를 "기존 → 변경"으로 표시합니다.
 - MXF는 웹 미리보기가 안 될 수 있지만 ffmpeg 입력으로는 처리 가능할 수 있습니다.
 
 소스 경로:
@@ -3454,6 +3592,12 @@ class CrataHandler(BaseHTTPRequestHandler):
             query = parse_qs(parsed.query)
             browse_path = (query.get('path') or [''])[0]
             self.send_json_or_jsonp(browse_video_files(browse_path), parsed.query)
+
+        elif path == '/api/video/artifact':
+            query = parse_qs(parsed.query)
+            artifact_path = (query.get('path') or [''])[0]
+            result = read_video_artifact(artifact_path)
+            self.send_json_or_jsonp(result, parsed.query, 200 if result.get('ok') else 404)
 
         elif path in ('/api/video/status', '/video_status.json'):
             self.send_json_or_jsonp(video_status_payload(), parsed.query)

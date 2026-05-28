@@ -11445,6 +11445,7 @@ const VIDEO_PROCESS_ALIASES = {
 
 let selectedVideoProcessId = '';
 let latestVideoStatusData = {};
+let selectedVideoArtifact = { stepId: '', path: '', title: '', content: '', loading: false, error: '', truncated: false };
 
 function defaultVideoProcessSteps() {
   return VIDEO_PROCESS_STEPS.map(step => ({ ...step }));
@@ -11518,6 +11519,83 @@ function videoArtifactEntries(data, stepId) {
   return [...list, ...byStep, ...extra].map(item => typeof item === 'string' ? { path: item } : item);
 }
 
+function videoArtifactIsText(path) {
+  return /\.(srt|ass|vtt|txt|md|json|csv|log)$/i.test(String(path || ''));
+}
+
+async function viewVideoArtifact(path, title, stepId) {
+  selectedVideoArtifact = { stepId, path, title, content: '', loading: true, error: '', truncated: false };
+  const completedFiles = Array.isArray(latestVideoStatusData.completed_files) ? latestVideoStatusData.completed_files : (Array.isArray(latestVideoStatusData.completed) ? latestVideoStatusData.completed : []);
+  const completedCount = Number.isFinite(Number(latestVideoStatusData.done)) ? Number(latestVideoStatusData.done) : completedFiles.length;
+  const totalCount = Number(latestVideoStatusData.total_files ?? latestVideoStatusData.total ?? 0);
+  renderVideoProcessFlow(latestVideoStatusData, totalCount, completedCount);
+  try {
+    const res = await fetchWithTimeout(`${SERVER_URL}/api/video/artifact?path=${encodeURIComponent(path)}`, {}, 10000);
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || '결과 파일을 읽지 못했습니다.');
+    selectedVideoArtifact = {
+      stepId,
+      path,
+      title: title || data.name || '결과',
+      content: data.content || data.message || '',
+      loading: false,
+      error: '',
+      truncated: !!data.truncated,
+    };
+  } catch (error) {
+    selectedVideoArtifact = { stepId, path, title, content: '', loading: false, error: error.message || '결과 파일을 읽지 못했습니다.', truncated: false };
+  }
+  renderVideoProcessFlow(latestVideoStatusData, totalCount, completedCount);
+}
+
+function renderVideoChanges(changes) {
+  const list = Array.isArray(changes) ? changes : [];
+  if (!list.length) return '';
+  return `
+    <div style="margin-top:9px;display:flex;flex-direction:column;gap:6px;">
+      ${list.slice(0, 10).map(change => {
+        const before = change.before ?? change.original ?? change.from ?? '';
+        const after = change.after ?? change.revised ?? change.to ?? '';
+        const reason = change.reason || change.note || '';
+        const where = change.segment || change.time || change.index || '';
+        return `
+          <div style="border:1px solid rgba(59,130,246,0.22);border-radius:var(--radius-sm);background:rgba(59,130,246,0.045);padding:8px;">
+            ${where ? `<div style="font-family:var(--font-mono);font-size:10.5px;color:var(--blue);margin-bottom:5px;">${escapeHtml(where)}</div>` : ''}
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) 20px minmax(0,1fr);gap:7px;align-items:start;">
+              <div style="font-size:11.5px;color:var(--text-muted);line-height:1.45;"><b style="color:var(--text);">기존</b><br>${escapeHtml(before || '—')}</div>
+              <div style="color:var(--blue);font-weight:900;text-align:center;">→</div>
+              <div style="font-size:11.5px;color:var(--text-hover);line-height:1.45;"><b style="color:var(--green);">변경</b><br>${escapeHtml(after || '—')}</div>
+            </div>
+            ${reason ? `<div style="margin-top:6px;font-size:11px;color:var(--text-muted);line-height:1.4;">근거: ${escapeHtml(reason)}</div>` : ''}
+          </div>
+        `;
+      }).join('')}
+      ${list.length > 10 ? `<div style="font-size:11px;color:var(--text-muted);">외 ${list.length - 10}개 변경사항은 결과 파일에서 확인하세요.</div>` : ''}
+    </div>
+  `;
+}
+
+function renderSelectedVideoArtifact(stepId) {
+  if (!selectedVideoArtifact.path || selectedVideoArtifact.stepId !== stepId) return '';
+  const body = selectedVideoArtifact.loading
+    ? '<div style="padding:18px;color:var(--text-muted);font-size:12px;">결과 파일을 읽는 중입니다.</div>'
+    : selectedVideoArtifact.error
+      ? `<div style="padding:18px;color:var(--red);font-size:12px;">${escapeHtml(selectedVideoArtifact.error)}</div>`
+      : `<pre style="margin:0;max-height:360px;overflow:auto;white-space:pre-wrap;word-break:break-word;font-family:var(--font-mono);font-size:11.5px;line-height:1.55;color:var(--text-hover);">${escapeHtml(selectedVideoArtifact.content || '내용이 없습니다.')}</pre>`;
+  return `
+    <div style="border:1px solid rgba(var(--accent-rgb),0.28);border-radius:var(--radius-md);background:rgba(0,0,0,0.2);overflow:hidden;">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px 10px;border-bottom:1px solid var(--border);background:rgba(var(--accent-rgb),0.055);">
+        <div style="min-width:0;">
+          <div style="font-size:12px;font-weight:850;color:var(--text-white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(selectedVideoArtifact.title || '프로세스 결과')}</div>
+          <div style="font-size:10.5px;color:var(--text-muted);font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(selectedVideoArtifact.path)}</div>
+        </div>
+        <button onclick="selectedVideoArtifact={stepId:'',path:'',title:'',content:'',loading:false,error:'',truncated:false}; renderVideoProcessFlow(latestVideoStatusData, Number(latestVideoStatusData.total_files ?? latestVideoStatusData.total ?? 0), Number(latestVideoStatusData.done ?? 0));" style="border:1px solid var(--border);background:var(--bg-input);color:var(--text-muted);border-radius:var(--radius-sm);padding:5px 8px;cursor:pointer;">닫기</button>
+      </div>
+      <div style="padding:10px;">${body}${selectedVideoArtifact.truncated ? '<div style="margin-top:8px;color:var(--yellow);font-size:11px;">파일이 커서 앞부분만 표시했습니다.</div>' : ''}</div>
+    </div>
+  `;
+}
+
 function renderVideoProcessResult(data, steps, selectedId) {
   const panel = document.getElementById('video-process-result-panel');
   if (!panel) return;
@@ -11536,13 +11614,18 @@ function renderVideoProcessResult(data, steps, selectedId) {
     const title = item.title || item.name || item.kind || '결과 파일';
     const isVideo = /\.(mp4|mov|mkv|avi|webm|m4v|mxf)$/i.test(path);
     const previewBtn = isVideo && path ? `<button onclick="previewDesktopVideo('${escapeHtml(escapeJs(path))}')" style="padding:5px 8px;border-radius:var(--radius-sm);border:1px solid rgba(59,130,246,0.32);background:rgba(59,130,246,0.12);color:#bfdbfe;font-size:11px;font-weight:800;cursor:pointer;">미리보기</button>` : '';
+    const viewBtn = !isVideo && path && videoArtifactIsText(path) ? `<button onclick="viewVideoArtifact('${escapeHtml(escapeJs(path))}','${escapeHtml(escapeJs(title))}','${escapeHtml(escapeJs(step.id))}')" style="padding:5px 8px;border-radius:var(--radius-sm);border:1px solid rgba(16,185,129,0.32);background:rgba(16,185,129,0.12);color:#bbf7d0;font-size:11px;font-weight:800;cursor:pointer;">보기</button>` : '';
+    const changesHtml = renderVideoChanges(item.changes || item.diff || item.revisions);
     return `
-      <div style="padding:9px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:rgba(255,255,255,0.015);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;">
-        <div style="min-width:0;">
-          <div style="font-size:12px;font-weight:800;color:var(--text-white);">${escapeHtml(title)}</div>
-          <div style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(path || item.message || item.note || '결과 경로 대기 중')}</div>
+      <div style="padding:9px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:rgba(255,255,255,0.015);">
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;">
+          <div style="min-width:0;">
+            <div style="font-size:12px;font-weight:800;color:var(--text-white);">${escapeHtml(title)}</div>
+            <div style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(path || item.message || item.note || '결과 경로 대기 중')}</div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;">${viewBtn}${previewBtn}</div>
         </div>
-        ${previewBtn}
+        ${changesHtml}
       </div>
     `;
   }).join('') : '<div style="padding:18px;text-align:center;color:var(--text-muted);font-size:12px;border:1px dashed var(--border);border-radius:var(--radius-sm);">아직 이 프로세스의 결과 파일이 없습니다.</div>';
@@ -11562,6 +11645,7 @@ function renderVideoProcessResult(data, steps, selectedId) {
       ${note ? `<div style="margin-top:8px;font-size:11.5px;color:var(--text-muted);line-height:1.45;">${escapeHtml(note)}</div>` : ''}
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;">${entriesHtml}</div>
+    ${renderSelectedVideoArtifact(step.id)}
   `;
 }
 
