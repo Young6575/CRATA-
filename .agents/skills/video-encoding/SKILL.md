@@ -95,14 +95,36 @@ H:\Q&A 강의 영상\subtitle_agent.py
   "total_files": 0,
   "completed_files": [],
   "current_step": 0,
+  "current_process": "raw_transcribe",
+  "current_process_label": "원본 전사",
   "message": "",
   "speaker_count": 2,
   "preset": "fast",
-  "preview_file": ""
+  "preview_file": "",
+  "process_status": {
+    "raw_transcribe": { "status": "active", "progress": 30 },
+    "diarize": { "status": "pending", "progress": 0 }
+  }
 }
 ```
 
 실패 시에는 `status`를 `error`로 두고, 어떤 파일에서 왜 실패했는지 `message`에 남긴다.
+
+## Process Status IDs
+
+대시보드는 아래 ID를 기준으로 현재 프로세스를 표시한다. 단계가 바뀔 때마다 `current_process`를 갱신한다.
+
+- `raw_transcribe`: 원본 전사
+- `diarize`: 화자분리
+- `transcript_quality_review`: 전사 품질검토
+- `crata_term_correction`: CRATA 용어 교정
+- `speaker_review`: 화자분리 검토
+- `subtitle_preview_review`: 미리보기 검수
+- `burnin`: 자막 하드코딩
+- `final_encode`: 최종 인코딩
+
+각 단계 상태는 `process_status.<id>.status`에 `pending`, `active`, `waiting`, `done`, `error` 중 하나로 기록한다.
+미리보기 확인 대기 중에는 `status: "waiting_preview_review"`와 `current_process: "subtitle_preview_review"`를 같이 기록한다.
 
 ## Expected Outputs
 

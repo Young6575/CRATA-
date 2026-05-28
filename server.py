@@ -23,6 +23,32 @@ LOCAL_SETTINGS_FILE = ROOT / '처리관리' / 'local_settings.json'
 VIDEO_EXTENSIONS = {'.mp4', '.mov', '.mkv', '.avi', '.webm', '.m4v', '.mts', '.m2ts', '.mxf'}
 VIDEO_EDIT_QUEUE_FILE = ROOT / '처리관리' / 'video_edit_queue.json'
 VIDEO_STATUS_FILE = ROOT / 'video_status.json'
+VIDEO_PROCESS_STEPS = [
+    {'id': 'raw_transcribe', 'label': '원본 전사', 'desc': 'large-v3로 원본 SRT/전사본 생성'},
+    {'id': 'diarize', 'label': '화자분리', 'desc': '입력한 화자 수 기준으로 화자 라벨 부여'},
+    {'id': 'transcript_quality_review', 'label': '전사 품질검토', 'desc': '오인식, 끊김, 반복, 어색한 문장 확인'},
+    {'id': 'crata_term_correction', 'label': 'CRATA 용어 교정', 'desc': '지식/결과지문구 기준으로 공식 용어 정리'},
+    {'id': 'speaker_review', 'label': '화자분리 검토', 'desc': '강사/질문자 라벨 뒤바뀜과 짧은 발화 확인'},
+    {'id': 'subtitle_preview_review', 'label': '미리보기 검수', 'desc': '자막 크기, 위치, 색상, 가림 여부 확인'},
+    {'id': 'burnin', 'label': '자막 하드코딩', 'desc': '승인된 자막을 영상에 합성'},
+    {'id': 'final_encode', 'label': '최종 인코딩', 'desc': '승인 후 전체 길이 최종 렌더링'},
+]
+VIDEO_PROCESS_ALIASES = {
+    'transcribe': 'raw_transcribe',
+    'transcription': 'raw_transcribe',
+    'diarization': 'diarize',
+    'review': 'transcript_quality_review',
+    'quality_review': 'transcript_quality_review',
+    'crata_review': 'crata_term_correction',
+    'crata_term_review': 'crata_term_correction',
+    'speaker_check': 'speaker_review',
+    'preview': 'subtitle_preview_review',
+    'preview_review': 'subtitle_preview_review',
+    'waiting_preview_review': 'subtitle_preview_review',
+    'hardcode': 'burnin',
+    'encode': 'final_encode',
+    'final': 'final_encode',
+}
 
 DEFAULT_CATEGORIES = [
     {'id': 'phrase-edit', 'name': '문구수정', 'color': 'blue', 'keywords': ['문구', '결과지', '카피', '표현', '윤문', 'revise', 'phrase']},
@@ -500,6 +526,33 @@ def read_video_status():
     return data if isinstance(data, dict) else {}
 
 
+def normalize_video_process_id(value):
+    raw = str(value or '').strip()
+    return VIDEO_PROCESS_ALIASES.get(raw, raw)
+
+
+def infer_current_video_process(status):
+    explicit = normalize_video_process_id(
+        status.get('current_process')
+        or status.get('current_process_id')
+        or status.get('current_step_id')
+        or status.get('task')
+    )
+    if explicit:
+        return explicit
+    if status.get('status') == 'waiting_preview_review':
+        return 'subtitle_preview_review'
+    try:
+        idx = int(status.get('current_step') or 0)
+    except (TypeError, ValueError):
+        idx = 0
+    if 1 <= idx <= len(VIDEO_PROCESS_STEPS):
+        return VIDEO_PROCESS_STEPS[idx - 1]['id']
+    if status.get('status') in ('requested', 'active'):
+        return VIDEO_PROCESS_STEPS[0]['id']
+    return ''
+
+
 def video_status_payload():
     status = {
         'status': 'idle',
@@ -509,9 +562,19 @@ def video_status_payload():
         'total_files': 0,
         'completed_files': [],
         'current_step': 0,
+        'current_process': '',
+        'process_steps': VIDEO_PROCESS_STEPS,
+        'process_status': {},
         'updated_at': '',
     }
     status.update(read_video_status())
+    if not status.get('total_files') and status.get('total'):
+        status['total_files'] = status.get('total') or 0
+    if not status.get('completed_files') and isinstance(status.get('completed'), list):
+        status['completed_files'] = status.get('completed')
+    if not status.get('process_steps'):
+        status['process_steps'] = VIDEO_PROCESS_STEPS
+    status['current_process'] = infer_current_video_process(status)
     return status
 
 
@@ -2312,6 +2375,10 @@ def create_video_encoding_task(data):
         'review_required': True,
         'preview_required': needs_preview,
         'preview_confirmation_required': needs_preview,
+        'current_process': 'raw_transcribe',
+        'current_process_label': '원본 전사 대기',
+        'process_steps': VIDEO_PROCESS_STEPS,
+        'process_status': {},
         'review_order': ['raw_transcribe', 'diarize', 'transcript_quality_review', 'crata_term_correction', 'speaker_review', 'subtitle_preview_review', 'final_encode'],
     }
     write_json_file(VIDEO_STATUS_FILE, status)
@@ -2324,7 +2391,7 @@ def create_video_encoding_task(data):
 - 실행 스크립트는 tools/video_agent/subtitle_agent.py를 우선 사용하세요. 아직 이관 전이면 C:\\Users\\wnsdu\\Desktop\\프로젝트\\영상편집에이전트\\subtitle_agent.py를 확인하세요.
 - ffmpeg, faster-whisper large-v3, pyannote diarization, subtitle burn-in, final encode 관련 실행 가능성을 확인하세요.
 - 실행 가능한 파이프라인이 없으면 임의 완료 처리하지 말고 필요한 스크립트/의존성/명령을 결과에 명확히 보고하세요.
-- 진행 중에는 video_status.json을 갱신하세요. 형식은 status(active|requested|done|error), progress, current_file, batch_progress, total_files, completed_files, current_step, message, speaker_count 입니다.
+- 진행 중에는 video_status.json을 갱신하세요. 형식은 status(active|requested|waiting_preview_review|done|error), progress, current_file, batch_progress, total_files, completed_files, current_process, current_process_label, process_status, message, speaker_count 입니다.
 - MXF는 웹 미리보기가 안 될 수 있지만 ffmpeg 입력으로는 처리 가능할 수 있습니다.
 
 소스 경로:
@@ -2353,6 +2420,19 @@ def create_video_encoding_task(data):
 6. 자막 미리보기 검수: 검토 완료된 전사/ASS로 30~60초 미리보기 클립을 먼저 생성하세요. 자막 크기, 위치, 하단 여백, 줄 수, 화자 색상, 얼굴/자료 화면 가림 여부를 확인할 수 있어야 합니다.
 7. 미리보기 승인 대기: 미리보기 파일 경로를 남기고 video_status.json에 status를 waiting_preview_review, preview_file, message로 갱신하세요. 사용자가 확인하기 전에는 최종 인코딩을 진행하지 마세요.
 8. 사용자가 미리보기 확인 후 승인한 경우에만 검토 완료된 전사/ASS를 기준으로 자막 하드코딩과 최종 인코딩을 진행하세요.
+
+프로세스 상태 표시 규칙:
+- 현재 단계가 바뀔 때마다 current_process를 아래 ID 중 하나로 갱신하세요.
+- raw_transcribe: 원본 전사
+- diarize: 화자분리
+- transcript_quality_review: 전사 품질검토
+- crata_term_correction: CRATA 용어 교정
+- speaker_review: 화자분리 검토
+- subtitle_preview_review: 미리보기 검수
+- burnin: 자막 하드코딩
+- final_encode: 최종 인코딩
+- process_status에는 각 단계별 status(pending|active|waiting|done|error)와 progress를 기록하세요.
+- 미리보기 확인 대기 상태에서는 status를 waiting_preview_review, current_process를 subtitle_preview_review로 두세요.
 
 처리 지침:
 1. 소스 경로가 데스크탑 서버 기준 실제 경로인지 다시 확인하세요.
