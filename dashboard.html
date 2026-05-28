@@ -6216,8 +6216,7 @@ body {
         <div class="card" style="display: flex; flex-direction: column; gap: 8px; padding: 16px 20px;">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
             <div>
-              <div class="card-title">비디오 자막 가공 프로세스</div>
-              <div id="video-process-current" style="margin-top:4px;font-size:12px;color:var(--text-muted);">현재 프로세스: 대기</div>
+              <div class="card-title" id="video-process-title">비디오 자막 가공 프로세스 · 대기</div>
             </div>
             <span id="video-process-progress-chip" style="font-size:11px;font-family:var(--font-mono);color:var(--text-muted);padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:var(--bg-input);white-space:nowrap;">0 / 8</span>
           </div>
@@ -11532,7 +11531,7 @@ function renderVideoProcessResult(data, steps, selectedId) {
 
 function renderVideoProcessFlow(data, totalCount, completedCount) {
   const flow = document.getElementById('video-process-flow');
-  const currentEl = document.getElementById('video-process-current');
+  const titleEl = document.getElementById('video-process-title');
   const chip = document.getElementById('video-process-progress-chip');
   if (!flow) return;
 
@@ -11548,11 +11547,10 @@ function renderVideoProcessFlow(data, totalCount, completedCount) {
   if (!selectedVideoProcessId || !steps.some(step => step.id === selectedVideoProcessId)) {
     selectedVideoProcessId = activeStep?.id || steps[0]?.id || '';
   }
-  if (currentEl) {
-    const message = data?.message ? ` · ${data.message}` : '';
-    currentEl.textContent = activeStep
-      ? `현재 프로세스: ${activeStep.label}${waitingPreview ? ' 확인 대기' : ''}${message}`
-      : (status === 'idle' ? '현재 프로세스: 대기' : `현재 프로세스: ${status}`);
+  if (titleEl) {
+    titleEl.textContent = activeStep
+      ? `비디오 자막 가공 프로세스 · ${activeStep.label}${waitingPreview ? ' 확인 대기' : ''}`
+      : (status === 'idle' ? '비디오 자막 가공 프로세스 · 대기' : `비디오 자막 가공 프로세스 · ${status}`);
   }
   if (chip) {
     const doneCount = doneAll ? steps.length : Math.max(currentIndex, 0);
