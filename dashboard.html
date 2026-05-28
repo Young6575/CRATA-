@@ -5087,6 +5087,267 @@ button.nav-item.active {
   border-color: rgba(148,163,184,0.14) !important;
 }
 
+.video-transcript-review-card {
+  margin-top: 10px;
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.video-transcript-review-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid var(--border);
+  background:
+    linear-gradient(90deg, rgba(var(--accent-rgb),0.08), transparent 42%),
+    rgba(255,255,255,0.012);
+}
+
+.video-transcript-review-title {
+  color: var(--text-white);
+  font-size: 17px;
+  font-weight: 850;
+  letter-spacing: 0;
+}
+
+.video-transcript-review-sub {
+  color: #9fb0c6;
+  font-size: 12.5px;
+  line-height: 1.55;
+  margin-top: 5px;
+}
+
+.video-transcript-review-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--accent-rgb),0.32);
+  background: rgba(var(--accent-rgb),0.09);
+  color: #dbeafe;
+  font-size: 11.5px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.video-transcript-review-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, .72fr);
+  min-height: 560px;
+}
+
+.video-final-transcript-panel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: rgba(5,7,12,0.30);
+}
+
+.video-final-transcript-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.video-final-transcript-source {
+  min-width: 0;
+  color: #a7b7cc;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.45;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.video-final-transcript-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.video-final-transcript-actions button,
+.video-transcript-review-send {
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-hover);
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.video-final-transcript-actions button {
+  padding: 6px 8px;
+}
+
+.video-final-transcript-actions button:hover,
+.video-transcript-review-send:hover {
+  border-color: rgba(var(--accent-rgb),0.36);
+  background: rgba(var(--accent-rgb),0.10);
+}
+
+.video-final-transcript-search {
+  width: 180px;
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.025);
+  color: var(--text-hover);
+  font-size: 12px;
+  outline: none;
+}
+
+.video-final-transcript-viewer {
+  flex: 1;
+  min-height: 520px;
+  max-height: 70vh;
+  overflow: auto;
+  padding: 14px;
+}
+
+.video-transcript-row {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 14px;
+  padding: 11px 12px;
+  border-bottom: 1px solid rgba(148,163,184,0.10);
+}
+
+.video-transcript-row:hover {
+  background: rgba(var(--accent-rgb),0.045);
+}
+
+.video-transcript-time {
+  color: #8fb5ff;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.55;
+  white-space: nowrap;
+}
+
+.video-transcript-text {
+  color: #f3f7fb;
+  font-family: 'Noto Sans KR', var(--font-sans);
+  font-weight: 700;
+  line-height: 1.75;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.video-transcript-review-side {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: rgba(255,255,255,0.012);
+}
+
+.video-transcript-review-thread {
+  flex: 1;
+  min-height: 360px;
+  max-height: 54vh;
+  overflow: auto;
+  padding: 14px;
+}
+
+.video-transcript-review-message {
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(255,255,255,0.024);
+  color: #dce7f4;
+  font-size: 12.5px;
+  line-height: 1.58;
+  margin-bottom: 9px;
+}
+
+.video-transcript-review-message.user {
+  border-color: rgba(var(--accent-rgb),0.30);
+  background: rgba(var(--accent-rgb),0.08);
+  color: #eef7ff;
+}
+
+.video-transcript-review-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: #93a4bb;
+  font-size: 10.5px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.video-transcript-review-composer {
+  border-top: 1px solid var(--border);
+  padding: 12px;
+  background: rgba(0,0,0,0.18);
+}
+
+.video-transcript-review-input {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  padding: 11px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-hover);
+  font-size: 13px;
+  line-height: 1.55;
+  outline: none;
+}
+
+.video-transcript-review-send {
+  width: 100%;
+  margin-top: 9px;
+  padding: 10px 12px;
+  background: rgba(var(--accent-rgb),0.14);
+  border-color: rgba(var(--accent-rgb),0.35);
+  color: #dbeafe;
+}
+
+.video-transcript-empty {
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #9fb0c6;
+  font-size: 13px;
+  line-height: 1.65;
+  border: 1px dashed rgba(148,163,184,0.18);
+  border-radius: var(--radius-md);
+  background: rgba(255,255,255,0.012);
+}
+
+@media (max-width: 1180px) {
+  .video-transcript-review-body {
+    grid-template-columns: 1fr;
+  }
+  .video-final-transcript-panel {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .video-final-transcript-toolbar {
+    grid-template-columns: 1fr;
+  }
+  .video-final-transcript-actions {
+    flex-wrap: wrap;
+  }
+  .video-final-transcript-search {
+    width: min(100%, 260px);
+  }
+}
+
 /* ===== READABILITY PASS ===== */
 body {
   font-size: 14px;
@@ -6269,6 +6530,38 @@ body {
           <div id="video-completed-list" style="display:none;"></div>
         </div>
       </div>
+
+      <!-- 최종 전사록 검토 -->
+      <section class="card video-transcript-review-card">
+        <div class="video-transcript-review-head">
+          <div>
+            <div class="video-transcript-review-title">최종 전사록 검토</div>
+            <div class="video-transcript-review-sub">화자분리 검토까지 끝난 전사록을 크게 띄워 읽고, 오른쪽 채팅에서 수정할 구간을 이어서 요청합니다.</div>
+          </div>
+          <span class="video-transcript-review-chip" id="video-final-transcript-chip">전사록 대기</span>
+        </div>
+        <div class="video-transcript-review-body">
+          <div class="video-final-transcript-panel">
+            <div class="video-final-transcript-toolbar">
+              <div class="video-final-transcript-source" id="video-final-transcript-source">최종 전사록 산출물이 생성되면 자동으로 연결됩니다.</div>
+              <div class="video-final-transcript-actions">
+                <input class="video-final-transcript-search" id="video-final-transcript-search" placeholder="시간·단어 찾기" oninput="setFinalTranscriptSearch(this.value)">
+                <button onclick="adjustFinalTranscriptFont(-1)">A-</button>
+                <button onclick="adjustFinalTranscriptFont(1)">A+</button>
+                <button onclick="reloadFinalTranscriptArtifact()">다시 읽기</button>
+              </div>
+            </div>
+            <div class="video-final-transcript-viewer" id="video-final-transcript-viewer"></div>
+          </div>
+          <aside class="video-transcript-review-side">
+            <div class="video-transcript-review-thread" id="video-transcript-review-thread"></div>
+            <div class="video-transcript-review-composer">
+              <textarea class="video-transcript-review-input" id="video-transcript-review-input" placeholder="예: 00:03:12 구간에서 '성장역량'을 '성장 역량'으로 띄어 써줘.&#10;예: 12분대 질문자 발화가 강사처럼 보이면 문맥 기준으로 다시 확인해줘."></textarea>
+              <button class="video-transcript-review-send" onclick="submitVideoTranscriptReviewNote()">수정 요청 보내기</button>
+            </div>
+          </aside>
+        </div>
+      </section>
 
     </div>
 
@@ -11569,6 +11862,16 @@ const VIDEO_PROCESS_ALIASES = {
 let selectedVideoProcessId = '';
 let latestVideoStatusData = {};
 let selectedVideoArtifact = { stepId: '', path: '', title: '', content: '', loading: false, error: '', truncated: false };
+let finalTranscriptState = {
+  artifact: null,
+  content: '',
+  loading: false,
+  error: '',
+  truncated: false,
+  fontSize: Number(localStorage.getItem('crataFinalTranscriptFontSize') || 16),
+  query: '',
+  messages: [],
+};
 
 function defaultVideoProcessSteps() {
   return VIDEO_PROCESS_STEPS.map(step => ({ ...step }));
@@ -11644,6 +11947,339 @@ function videoArtifactEntries(data, stepId) {
 
 function videoArtifactIsText(path) {
   return /\.(srt|ass|vtt|txt|md|json|csv|log)$/i.test(String(path || ''));
+}
+
+function videoArtifactIsTranscriptLike(path) {
+  return /\.(srt|ass|vtt|txt|md)$/i.test(String(path || ''));
+}
+
+function videoArtifactPath(item) {
+  return String((item && (item.path || item.file || item.url)) || '').trim();
+}
+
+function finalTranscriptStorageKey(path) {
+  return `crata:video-final-transcript-review:${path || 'default'}`;
+}
+
+function loadFinalTranscriptMessages(path) {
+  try {
+    const stored = JSON.parse(localStorage.getItem(finalTranscriptStorageKey(path)) || '[]');
+    finalTranscriptState.messages = Array.isArray(stored) ? stored : [];
+  } catch (_) {
+    finalTranscriptState.messages = [];
+  }
+}
+
+function saveFinalTranscriptMessages() {
+  const path = finalTranscriptState.artifact?.path || 'default';
+  try {
+    localStorage.setItem(finalTranscriptStorageKey(path), JSON.stringify(finalTranscriptState.messages.slice(-40)));
+  } catch (_) {}
+}
+
+function finalTranscriptCandidateLabel(artifact) {
+  const stepId = artifact?.stepId || '';
+  const path = String(artifact?.path || '');
+  if (!artifact) return '전사록 대기';
+  if (stepId === 'speaker_review' && /\.(srt|ass|vtt|txt)$/i.test(path)) return '최종 검토본';
+  if (/(_final_reviewed|_speaker_reviewed|_reviewed)\.(srt|ass|vtt|txt)$/i.test(path)) return '검토 완료본';
+  if (stepId === 'crata_term_correction') return '용어 교정본';
+  if (stepId === 'diarize') return '화자분리본';
+  if (stepId === 'raw_transcribe') return '원본 전사본';
+  return '전사록 후보';
+}
+
+function finalTranscriptCandidateScore(item, stepId) {
+  const path = videoArtifactPath(item);
+  const viewer = String(item?.viewer || '').toLowerCase();
+  const title = String(item?.title || item?.kind || '').toLowerCase();
+  let score = {
+    speaker_review: 500,
+    crata_term_correction: 420,
+    diarize: 300,
+    raw_transcribe: 180,
+  }[stepId] || 0;
+  if (/(_final_reviewed|_speaker_reviewed|_reviewed)\.(srt|ass|vtt|txt)$/i.test(path)) score += 180;
+  if (/\.(srt|vtt|txt)$/i.test(path)) score += 50;
+  if (/\.ass$/i.test(path)) score += 35;
+  if (/\.md$/i.test(path)) score -= 90;
+  if (viewer === 'transcript' || viewer === 'diarized') score += 40;
+  if (/최종|검토|reviewed|전사/.test(title)) score += 20;
+  return score;
+}
+
+function pickFinalTranscriptArtifact(data) {
+  const priority = ['speaker_review', 'crata_term_correction', 'diarize', 'raw_transcribe'];
+  const candidates = [];
+  priority.forEach(stepId => {
+    videoArtifactEntries(data || {}, stepId).forEach(item => {
+      const path = videoArtifactPath(item);
+      if (!path || !videoArtifactIsTranscriptLike(path)) return;
+      candidates.push({
+        ...item,
+        path,
+        stepId,
+        score: finalTranscriptCandidateScore(item, stepId),
+      });
+    });
+  });
+  candidates.sort((a, b) => b.score - a.score);
+  return candidates[0] || null;
+}
+
+function stripSubtitleSpeakerAndFormat(text) {
+  return String(text || '')
+    .replace(/\{[^}]*\}/g, '')
+    .replace(/\\N|\\n/g, ' ')
+    .replace(/\\h/g, ' ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/^\s*\[(?:강사|질문자|진행자|사회자|SPEAKER[_\s-]*\d+|Speaker\s*\d+)\]\s*/i, '')
+    .replace(/^\s*(?:강사|질문자|진행자|사회자|SPEAKER[_\s-]*\d+|Speaker\s*\d+)\s*[:：]\s*/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function parseTranscriptSegments(content, path) {
+  const text = String(content || '').replace(/\r/g, '');
+  const ext = String(path || '').split('.').pop().toLowerCase();
+  const segments = [];
+
+  if (ext === 'ass' || /^\s*Dialogue:/m.test(text)) {
+    text.split('\n').forEach(line => {
+      if (!/^\s*Dialogue:/i.test(line)) return;
+      const payload = line.replace(/^\s*Dialogue:\s*/i, '');
+      const parts = payload.split(',');
+      const start = parts[1] || '';
+      const end = parts[2] || '';
+      const body = stripSubtitleSpeakerAndFormat(parts.slice(9).join(','));
+      if (body) segments.push({ time: [start, end].filter(Boolean).join(' → '), text: body });
+    });
+    if (segments.length) return segments;
+  }
+
+  const blocks = text.split(/\n{2,}/).map(block => block.trim()).filter(Boolean);
+  blocks.forEach((block, index) => {
+    const lines = block.split('\n').map(line => line.trim()).filter(Boolean);
+    const timeIndex = lines.findIndex(line => /\d{1,2}:\d{2}:\d{2}[,.]\d{1,3}\s*-->\s*\d{1,2}:\d{2}:\d{2}[,.]\d{1,3}/.test(line));
+    if (timeIndex >= 0) {
+      const time = lines[timeIndex].replace(/,/g, '.');
+      const body = stripSubtitleSpeakerAndFormat(lines.slice(timeIndex + 1).join(' '));
+      if (body) segments.push({ time, text: body });
+    } else if (ext === 'md' || ext === 'txt') {
+      const body = stripSubtitleSpeakerAndFormat(lines.join(' '));
+      if (body) segments.push({ time: `#${index + 1}`, text: body });
+    }
+  });
+
+  if (segments.length) return segments;
+  return text.split('\n').map(line => stripSubtitleSpeakerAndFormat(line)).filter(Boolean).map((line, index) => ({ time: `#${index + 1}`, text: line }));
+}
+
+function setFinalTranscriptSearch(value) {
+  finalTranscriptState.query = String(value || '').trim();
+  renderFinalTranscriptReview(latestVideoStatusData);
+}
+
+function adjustFinalTranscriptFont(delta) {
+  const next = Math.max(14, Math.min(24, (finalTranscriptState.fontSize || 16) + delta));
+  finalTranscriptState.fontSize = next;
+  localStorage.setItem('crataFinalTranscriptFontSize', String(next));
+  renderFinalTranscriptReview(latestVideoStatusData);
+}
+
+async function loadFinalTranscriptArtifact(artifact) {
+  if (!artifact?.path) return;
+  const targetPath = artifact.path;
+  finalTranscriptState.loading = true;
+  finalTranscriptState.error = '';
+  renderFinalTranscriptReview(latestVideoStatusData);
+  try {
+    const res = await fetchWithTimeout(`${SERVER_URL}/api/video/artifact?path=${encodeURIComponent(targetPath)}`, {}, 12000);
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || '최종 전사록을 읽지 못했습니다.');
+    if (finalTranscriptState.artifact?.path !== targetPath) return;
+    finalTranscriptState.content = data.content || data.message || '';
+    finalTranscriptState.loading = false;
+    finalTranscriptState.error = '';
+    finalTranscriptState.truncated = !!data.truncated;
+  } catch (error) {
+    if (finalTranscriptState.artifact?.path !== targetPath) return;
+    finalTranscriptState.content = '';
+    finalTranscriptState.loading = false;
+    finalTranscriptState.error = error.message || '최종 전사록을 읽지 못했습니다.';
+    finalTranscriptState.truncated = false;
+  }
+  renderFinalTranscriptReview(latestVideoStatusData);
+}
+
+function reloadFinalTranscriptArtifact() {
+  const artifact = finalTranscriptState.artifact || pickFinalTranscriptArtifact(latestVideoStatusData);
+  if (!artifact?.path) {
+    showToast('아직 열 수 있는 전사록 산출물이 없습니다.', 'warning');
+    return;
+  }
+  loadFinalTranscriptArtifact(artifact);
+}
+
+function ensureFinalTranscriptArtifact(data) {
+  const artifact = pickFinalTranscriptArtifact(data || {});
+  if (!artifact?.path) {
+    if (finalTranscriptState.artifact) {
+      finalTranscriptState.artifact = null;
+      finalTranscriptState.content = '';
+      finalTranscriptState.error = '';
+      finalTranscriptState.loading = false;
+      finalTranscriptState.messages = [];
+    }
+    renderFinalTranscriptReview(data);
+    return;
+  }
+
+  if (!finalTranscriptState.artifact || finalTranscriptState.artifact.path !== artifact.path) {
+    finalTranscriptState.artifact = artifact;
+    finalTranscriptState.content = '';
+    finalTranscriptState.error = '';
+    finalTranscriptState.truncated = false;
+    loadFinalTranscriptMessages(artifact.path);
+    loadFinalTranscriptArtifact(artifact);
+    return;
+  }
+
+  finalTranscriptState.artifact = { ...finalTranscriptState.artifact, ...artifact };
+  renderFinalTranscriptReview(data);
+}
+
+function renderFinalTranscriptRows() {
+  const viewer = document.getElementById('video-final-transcript-viewer');
+  if (!viewer) return;
+  const artifact = finalTranscriptState.artifact;
+  if (!artifact?.path) {
+    viewer.innerHTML = '<div class="video-transcript-empty">화자분리 검토본 또는 교정본이 생성되면 여기에 크게 표시됩니다.</div>';
+    return;
+  }
+  if (finalTranscriptState.loading) {
+    viewer.innerHTML = '<div class="video-transcript-empty">최종 전사록을 읽는 중입니다.</div>';
+    return;
+  }
+  if (finalTranscriptState.error) {
+    viewer.innerHTML = `<div class="video-transcript-empty" style="color:var(--red);">${escapeHtml(finalTranscriptState.error)}</div>`;
+    return;
+  }
+  if (!finalTranscriptState.content) {
+    viewer.innerHTML = '<div class="video-transcript-empty">표시할 전사록 내용이 없습니다.</div>';
+    return;
+  }
+
+  const query = finalTranscriptState.query.toLowerCase();
+  let rows = parseTranscriptSegments(finalTranscriptState.content, artifact.path);
+  const totalRows = rows.length;
+  if (query) {
+    rows = rows.filter(row => `${row.time} ${row.text}`.toLowerCase().includes(query));
+  }
+  const shownRows = rows.slice(0, 1800);
+  const fontSize = Math.max(14, Math.min(24, finalTranscriptState.fontSize || 16));
+  viewer.innerHTML = `
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:10px;color:#9fb0c6;font-size:12px;">
+      <span>${escapeHtml(finalTranscriptCandidateLabel(artifact))} · ${query ? `${rows.length}/${totalRows}개 검색` : `${totalRows}개 구간`}</span>
+      ${finalTranscriptState.truncated ? '<span style="color:var(--yellow);">파일이 커서 앞부분만 표시 중</span>' : ''}
+    </div>
+    ${shownRows.map(row => `
+      <div class="video-transcript-row">
+        <div class="video-transcript-time">${escapeHtml(row.time || '')}</div>
+        <div class="video-transcript-text" style="font-size:${fontSize}px;">${escapeHtml(row.text || '')}</div>
+      </div>
+    `).join('')}
+    ${rows.length > shownRows.length ? `<div style="padding:14px;color:var(--text-muted);font-size:12px;text-align:center;">표시 성능을 위해 ${shownRows.length}개 구간까지만 먼저 보여줍니다. 검색으로 필요한 구간을 좁혀 보세요.</div>` : ''}
+  `;
+}
+
+function renderFinalTranscriptReviewThread() {
+  const thread = document.getElementById('video-transcript-review-thread');
+  if (!thread) return;
+  const artifact = finalTranscriptState.artifact;
+  const messages = finalTranscriptState.messages || [];
+  const base = messages.length ? '' : `
+    <div class="video-transcript-review-message">
+      <div class="video-transcript-review-meta"><span>Codex</span><span>대기</span></div>
+      <div>전사록을 보면서 시간대와 수정 방향을 남기면 영상/미디어 작업으로 등록됩니다. 최종 인코딩은 이 검토와 미리보기 승인 후 진행합니다.</div>
+    </div>
+  `;
+  thread.innerHTML = base + messages.map(msg => `
+    <div class="video-transcript-review-message ${msg.role === 'user' ? 'user' : ''}">
+      <div class="video-transcript-review-meta"><span>${escapeHtml(msg.role === 'user' ? '사용자' : 'Codex')}</span><span>${escapeHtml(msg.at || '')}</span></div>
+      <div>${escapeHtml(msg.content || '')}</div>
+      ${msg.taskId ? `<div style="margin-top:7px;color:#9fb0c6;font-family:var(--font-mono);font-size:10.5px;">task ${escapeHtml(msg.taskId)}</div>` : ''}
+    </div>
+  `).join('');
+  thread.scrollTop = thread.scrollHeight;
+  const input = document.getElementById('video-transcript-review-input');
+  if (input) input.disabled = !artifact?.path;
+}
+
+function renderFinalTranscriptReview(data = latestVideoStatusData) {
+  const chip = document.getElementById('video-final-transcript-chip');
+  const source = document.getElementById('video-final-transcript-source');
+  const artifact = finalTranscriptState.artifact || pickFinalTranscriptArtifact(data || {});
+  if (chip) chip.textContent = finalTranscriptState.loading ? '읽는 중' : finalTranscriptCandidateLabel(artifact);
+  if (source) {
+    source.textContent = artifact?.path
+      ? `${finalTranscriptCandidateLabel(artifact)} · ${artifact.title || artifact.kind || '전사록'} · ${artifact.path}`
+      : '최종 전사록 산출물이 생성되면 자동으로 연결됩니다.';
+  }
+  renderFinalTranscriptRows();
+  renderFinalTranscriptReviewThread();
+}
+
+async function submitVideoTranscriptReviewNote() {
+  const input = document.getElementById('video-transcript-review-input');
+  const note = String(input?.value || '').trim();
+  const artifact = finalTranscriptState.artifact || pickFinalTranscriptArtifact(latestVideoStatusData);
+  if (!artifact?.path) {
+    showToast('수정 요청을 연결할 전사록 산출물이 없습니다.', 'warning');
+    return;
+  }
+  if (!note) {
+    showToast('수정할 시간대나 내용을 입력하세요.', 'warning');
+    return;
+  }
+
+  const at = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+  finalTranscriptState.messages.push({ role: 'user', content: note, at });
+  if (input) input.value = '';
+  saveFinalTranscriptMessages();
+  renderFinalTranscriptReviewThread();
+  showToast('전사록 수정 요청을 작업으로 등록합니다.', 'info');
+
+  try {
+    const saved = await postToServer('/api/video/transcript-review', {
+      note,
+      artifactPath: artifact.path,
+      artifactTitle: artifact.title || artifact.kind || finalTranscriptCandidateLabel(artifact),
+      processId: artifact.stepId,
+      sourcePath: latestVideoStatusData?.source_path || latestVideoStatusData?.current_file || '',
+      runnerPreference: 'codex',
+    }, 20000);
+    if (!saved?.ok) throw new Error(saved?.error || '작업 등록에 실패했습니다.');
+    finalTranscriptState.messages.push({
+      role: 'assistant',
+      content: '수정 요청을 영상/미디어 작업으로 등록했습니다. 작업 지시서에서 실행 로그와 결과를 이어서 볼 수 있습니다.',
+      at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+      taskId: saved.task?.id || '',
+    });
+    saveFinalTranscriptMessages();
+    renderFinalTranscriptReviewThread();
+    showToast('전사록 수정 요청을 등록했습니다.', 'success');
+    setTimeout(fetchRealData, 1000);
+  } catch (error) {
+    finalTranscriptState.messages.push({
+      role: 'assistant',
+      content: error.message || '수정 요청 등록 중 오류가 발생했습니다.',
+      at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+    });
+    saveFinalTranscriptMessages();
+    renderFinalTranscriptReviewThread();
+    showToast(error.message || '수정 요청 등록 중 오류가 발생했습니다.', 'warning');
+  }
 }
 
 async function viewVideoArtifact(path, title, stepId) {
@@ -12045,6 +12681,7 @@ function updateVideoUI(data) {
   renderVideoProcessFlow(data, totalCount, completedCount);
   renderVideoSystemMetrics(data);
   renderVideoModelStatus(data);
+  ensureFinalTranscriptArtifact(data);
   
   // Update dashboard mini tracker too!
   const homeVideoCard = document.getElementById('home-video-card');

@@ -837,6 +837,9 @@ def enrich_video_process_results(status):
             ('transcript_quality_review', '전사 품질검토 리포트', folder / f'{stem}_quality_review.md', 'quality review', 'review'),
             ('crata_term_correction', 'CRATA 용어 교정 리포트', folder / f'{stem}_term_correction.md', 'term correction', 'changes'),
             ('crata_term_correction', 'CRATA 용어 교정본', folder / f'{stem}_reviewed.srt', 'corrected transcript', 'transcript'),
+            ('speaker_review', '최종 검토 전사록', folder / f'{stem}_final_reviewed.srt', 'final reviewed transcript', 'transcript'),
+            ('speaker_review', '화자분리 검토 전사록', folder / f'{stem}_speaker_reviewed.srt', 'speaker reviewed transcript', 'transcript'),
+            ('speaker_review', '화자분리 검토 ASS', folder / f'{stem}_reviewed.ass', 'speaker reviewed subtitle', 'diarized'),
             ('speaker_review', '화자분리 검토 리포트', folder / f'{stem}_speaker_review.md', 'speaker review', 'review'),
             ('subtitle_preview_review', '자막 미리보기', folder / f'{stem}_preview.mp4', 'preview', 'video'),
             ('burnin', '자막 하드코딩 결과', folder / f'{stem}_sub.mp4', 'burned video', 'video'),
@@ -3124,6 +3127,7 @@ def create_video_encoding_task(data):
 - 현재 사용 중인 모델은 model_status.active_model, model_status.device, model_status.compute, model_status.task로 남기세요.
 - 각 프로세스 산출물은 process_results.<process_id> 또는 artifacts에 파일 경로와 설명을 남기세요. 대시보드에서 프로세스를 클릭하면 이 값들이 표시됩니다.
 - process_results에는 가능한 한 아래 형태를 사용하세요: {{"title":"원본 전사록","path":"...srt","kind":"전사록","viewer":"transcript"}}. CRATA 용어 교정이나 품질검토처럼 수정 내역이 있는 단계는 changes 배열에 {{"before":"기존 문장","after":"변경 문장","reason":"근거","segment":"00:01:23"}} 형태로 남기세요. 대시보드는 이를 "기존 → 변경"으로 표시합니다.
+- 화자분리 검토까지 끝난 최종 검토 전사록은 _final_reviewed.srt 또는 _speaker_reviewed.srt로 저장하고 process_results.speaker_review에 viewer="transcript"로 남기세요. 이 파일이 대시보드의 최종 전사록 검토 패널에 표시됩니다.
 - MXF는 웹 미리보기가 안 될 수 있지만 ffmpeg 입력으로는 처리 가능할 수 있습니다.
 
 소스 경로:
@@ -3159,9 +3163,10 @@ def create_video_encoding_task(data):
 3. 전사 품질검토: 화자 라벨이 붙은 전사록 전체를 문맥 기준으로 읽고 오인식, 끊김, 반복, 어색한 문장을 검토하세요.
 4. CRATA 용어 교정: 지식/과 결과지문구/의 공식 용어를 기준으로 CRATA 관련 단어를 교정하세요. 의미가 바뀔 수 있는 부분은 임의 확정하지 말고 확인 필요로 남기세요.
 5. 화자분리 검토: 강사/질문자 라벨이 문맥상 뒤바뀐 구간, 짧은 맞장구, 질문 구간을 확인해 수정하거나 확인 필요로 표시하세요.
-6. 자막 미리보기 검수: 검토 완료된 전사/ASS로 30~60초 미리보기 클립을 먼저 생성하세요. 자막 크기, 위치, 하단 여백, 줄 수, 화자 색상, 얼굴/자료 화면 가림 여부를 확인할 수 있어야 합니다.
-7. 미리보기 승인 대기: 미리보기 파일 경로를 남기고 video_status.json에 status를 waiting_preview_review, preview_file, message로 갱신하세요. 사용자가 확인하기 전에는 최종 인코딩을 진행하지 마세요.
-8. 사용자가 미리보기 확인 후 승인한 경우에만 검토 완료된 전사/ASS를 기준으로 자막 하드코딩과 최종 인코딩을 진행하세요.
+6. 최종 검토 전사록: 화자분리 검토까지 반영한 전사록을 _final_reviewed.srt 또는 _speaker_reviewed.srt로 저장하세요. 최종 표시 자막에는 [강사], [질문자] 같은 접두어를 넣지 않습니다.
+7. 자막 미리보기 검수: 최종 검토 전사/ASS로 30~60초 미리보기 클립을 먼저 생성하세요. 자막 크기, 위치, 하단 여백, 줄 수, 화자 색상, 얼굴/자료 화면 가림 여부를 확인할 수 있어야 합니다.
+8. 미리보기 승인 대기: 미리보기 파일 경로를 남기고 video_status.json에 status를 waiting_preview_review, preview_file, message로 갱신하세요. 사용자가 확인하기 전에는 최종 인코딩을 진행하지 마세요.
+9. 사용자가 미리보기 확인 후 승인한 경우에만 검토 완료된 전사/ASS를 기준으로 자막 하드코딩과 최종 인코딩을 진행하세요.
 
 프로세스 상태 표시 규칙:
 - 현재 단계가 바뀔 때마다 current_process를 아래 ID 중 하나로 갱신하세요.
@@ -3211,6 +3216,67 @@ def create_video_encoding_task(data):
         ],
     }, start=True)
     return {'ok': True, 'task': task, 'videoStatus': status}
+
+
+def create_video_transcript_review_task(data):
+    note = str(data.get('note') or data.get('message') or '').strip()
+    artifact_path = str(data.get('artifactPath') or data.get('path') or '').strip()
+    if not artifact_path:
+        return {'ok': False, 'error': '전사록 파일 경로가 없습니다.'}
+    if not note:
+        return {'ok': False, 'error': '수정 요청 내용을 입력하세요.'}
+
+    artifact_title = str(data.get('artifactTitle') or data.get('title') or '최종 전사록').strip()
+    source_path = str(data.get('sourcePath') or '').strip()
+    process_id = normalize_video_process_id(data.get('processId') or data.get('process') or '')
+    runner_preference = data.get('runnerPreference') if data.get('runnerPreference') in ('claude', 'codex') else 'codex'
+
+    desc = f"""영상 최종 전사록 수정 요청입니다.
+
+대상 전사록:
+{artifact_path}
+
+원본 영상:
+{source_path or 'video_status.json의 current_file/source_path를 확인'}
+
+현재 산출물:
+{artifact_title}
+
+사용자 수정 요청:
+{note}
+
+작업 방식:
+1. 대상 전사록 파일 전체를 UTF-8로 읽고, 사용자가 남긴 시간대/문구/화자 단서를 찾으세요.
+2. 최종 검토 기준은 "화자분리 검토까지 끝난 전사록"입니다. 기존 원본 .srt는 보존하고, 수정본은 _final_reviewed.srt 또는 _speaker_reviewed.srt처럼 검토본임이 드러나는 이름으로 저장하세요.
+3. [강사], [질문자] 같은 화자 접두어는 최종 표시 자막에 넣지 마세요. 필요한 경우 내부 검토 리포트에만 화자 판단 근거를 남기세요.
+4. CRATA 용어 교정이나 문장 수정이 있으면 process_results.crata_term_correction 또는 process_results.speaker_review의 changes 배열에 {{"before":"기존","after":"변경","reason":"근거","segment":"시간대"}} 형태로 남기세요.
+5. 수정 결과 파일과 검토 리포트 경로를 video_status.json의 process_results.speaker_review에 추가하세요. 대시보드가 최종 전사록 검토 패널에서 바로 읽을 수 있어야 합니다.
+6. 의미가 달라질 수 있거나 사용자의 추가 확인이 필요한 구간은 임의 확정하지 말고 Codex Output에 후보와 질문을 남기세요.
+7. 미리보기 생성이나 최종 인코딩은 사용자의 별도 승인 전에는 진행하지 마세요.
+"""
+
+    task, _ = save_task_request({
+        'title': f'최종 전사록 수정: {pathlib.Path(artifact_path).name or artifact_title}',
+        'desc': desc,
+        'type': 'video_transcript_review',
+        'priority': 'normal',
+        'priorityLbl': '보통',
+        'agent': 'media',
+        'agentName': '영상담당',
+        'runnerPreference': runner_preference,
+        'categoryId': 'media-work',
+        'categoryName': '영상/미디어',
+        'categoryColor': 'red',
+        'videoArtifactPath': artifact_path,
+        'videoArtifactTitle': artifact_title,
+        'videoSourcePath': source_path,
+        'videoProcessId': process_id,
+        'videoReviewNote': note,
+        'assignments': [
+            {'name': '영상담당', 'role': '최종 전사록 수정 검토', 'progress': 0, 'status': 'pending'},
+        ],
+    }, start=True)
+    return {'ok': True, 'task': task}
 
 
 # ── 데이터 파싱 헬퍼 ────────────────────────────────────────────────
@@ -3580,6 +3646,8 @@ def handle_action(action, data):
         return create_video_encoding_task(data)
     if action == 'video/encoding/cancel':
         return cancel_video_encoding_task(data)
+    if action == 'video/transcript-review':
+        return create_video_transcript_review_task(data)
     if action == 'calendar':
         return save_calendar_event(data)
     if action == 'calendar/parse':
@@ -3843,6 +3911,9 @@ class CrataHandler(BaseHTTPRequestHandler):
 
         elif path == '/api/video/encoding/cancel':
             self.send_json(cancel_video_encoding_task(data))
+
+        elif path == '/api/video/transcript-review':
+            self.send_json(create_video_transcript_review_task(data))
 
         elif path == '/api/video/subtitle-style':
             self.send_json(save_video_subtitle_style(data))
