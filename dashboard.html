@@ -8863,8 +8863,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('cmd-input').addEventListener('input', filterCmdItems);
   
   // Real video_status.json Polling
-  // We check for updates every 10 seconds.
-  setInterval(pollVideoStatus, 10000);
+  // Video jobs should feel live while the desktop pipeline is running.
+  setInterval(pollVideoStatus, 2000);
   pollVideoStatus(); // First execution
 
   // Initialize multi-agent columns
@@ -11770,7 +11770,7 @@ function updateVideoUI(data) {
       navDot.style.backgroundColor = 'var(--green)';
       navDot.style.boxShadow = '0 0 8px var(--green)';
     }
-    if (elapsedLbl) elapsedLbl.textContent = `${currentLabel} 진행 중`;
+    if (elapsedLbl) elapsedLbl.textContent = data.message || `${currentLabel} 진행 중`;
   } else if (status === 'requested') {
     if (navDot) {
       navDot.style.backgroundColor = 'var(--yellow)';

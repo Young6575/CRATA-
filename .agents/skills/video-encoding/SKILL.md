@@ -87,6 +87,7 @@ H:\Q&A 강의 영상\subtitle_agent.py
 ## Status File
 
 진행 중에는 `video_status.json`을 계속 갱신한다.
+프로젝트 루트의 `video_status.json`이 우선이며, 기존 데스크탑 영상 에이전트를 그대로 실행해 `C:\Users\wnsdu\OneDrive\대시보드\video_status.json`에 `task`, `progress_pct`, `done`, `total`을 쓰는 경우에도 대시보드가 이를 읽어 현재 프로세스 진행률로 변환한다.
 
 ```json
 {

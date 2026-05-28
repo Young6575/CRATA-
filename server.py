@@ -522,9 +522,159 @@ def make_video_edit_item(source_path, title='', source='manual', status='pending
     }
 
 
+def video_status_file_mtime(fpath):
+    try:
+        return pathlib.Path(fpath).stat().st_mtime
+    except Exception:
+        return 0
+
+
+def configured_video_status_files():
+    paths = []
+    settings = read_local_settings()
+    video_settings = settings.get('video') if isinstance(settings.get('video'), dict) else {}
+
+    for key in ('status_file', 'external_status_file', 'legacy_status_file'):
+        value = video_settings.get(key)
+        if value:
+            paths.append(value)
+
+    status_files = video_settings.get('status_files')
+    if isinstance(status_files, list):
+        paths.extend(status_files)
+
+    env_paths = os.environ.get('CRATA_VIDEO_STATUS_FILES') or os.environ.get('CRATA_VIDEO_STATUS_FILE')
+    if env_paths:
+        paths.extend(part for part in env_paths.split(os.pathsep) if part.strip())
+
+    paths.append(pathlib.Path.home() / 'OneDrive' / '대시보드' / 'video_status.json')
+
+    unique = []
+    seen = set()
+    for raw in paths:
+        try:
+            fpath = pathlib.Path(raw).expanduser()
+        except Exception:
+            continue
+        key = str(fpath).lower()
+        if key == str(VIDEO_STATUS_FILE).lower() or key in seen:
+            continue
+        seen.add(key)
+        unique.append(fpath)
+    return unique
+
+
+def normalize_legacy_video_status(data, legacy_source=False):
+    status = dict(data or {})
+    progress_pct = status.get('progress_pct')
+    progress = status.get('progress')
+    try:
+        pct = float(progress_pct if progress_pct is not None else (progress or 0))
+    except (TypeError, ValueError):
+        pct = 0
+
+    if progress_pct is not None and (legacy_source or progress in (None, '', 0)):
+        status['progress'] = pct
+
+    if not status.get('total_files') and status.get('total') is not None:
+        status['total_files'] = status.get('total') or 0
+    if not status.get('completed_files') and isinstance(status.get('completed'), list):
+        status['completed_files'] = status.get('completed')
+
+    completed_files = status.get('completed_files') if isinstance(status.get('completed_files'), list) else []
+    try:
+        total_files = int(status.get('total_files') or status.get('total') or 0)
+    except (TypeError, ValueError):
+        total_files = 0
+    try:
+        done_count = int(status.get('done') if status.get('done') is not None else len(completed_files))
+    except (TypeError, ValueError):
+        done_count = len(completed_files)
+
+    if total_files > 0:
+        batch_progress = ((done_count + min(max(pct, 0), 100) / 100) / total_files) * 100
+        status['batch_progress'] = round(min(max(batch_progress, 0), 100), 1)
+
+    current_process = infer_current_video_process(status)
+    if current_process:
+        status['current_process'] = current_process
+        process_status = status.get('process_status') if isinstance(status.get('process_status'), dict) else {}
+        current_info = process_status.get(current_process) if isinstance(process_status.get(current_process), dict) else {}
+        process_status[current_process] = {
+            **current_info,
+            'status': 'done' if pct >= 100 and (not total_files or done_count >= total_files) else 'active',
+            'progress': min(max(pct, 0), 100),
+            'message': status.get('current_file') or current_info.get('message') or '',
+        }
+        current_idx = next((idx for idx, step in enumerate(VIDEO_PROCESS_STEPS) if step['id'] == current_process), -1)
+        for idx, step in enumerate(VIDEO_PROCESS_STEPS):
+            if idx < current_idx and step['id'] not in process_status:
+                process_status[step['id']] = {'status': 'done', 'progress': 100}
+        status['process_status'] = process_status
+
+    if legacy_source or (status.get('task') and status.get('status') in (None, '', 'idle', 'requested')):
+        finished = pct >= 100 and (not total_files or done_count >= total_files)
+        status['status'] = 'done' if finished else 'active'
+
+    return status
+
+
+def video_status_source_names(status):
+    names = set()
+    for key in ('source_path', 'current_file', 'path', 'videoSourcePath'):
+        value = str(status.get(key) or '').strip()
+        if not value:
+            continue
+        name = re.split(r'[\\/]+', value)[-1].strip().lower()
+        if name:
+            names.add(name)
+    return names
+
+
+def video_status_refers_to_same_source(base, candidate):
+    base_names = video_status_source_names(base)
+    candidate_names = video_status_source_names(candidate)
+    if base_names and candidate_names and base_names.intersection(candidate_names):
+        return True
+    base_text = ' '.join(str(base.get(key) or '') for key in ('source_path', 'current_file')).lower()
+    candidate_text = ' '.join(str(candidate.get(key) or '') for key in ('source_path', 'current_file')).lower()
+    return any(name and name in candidate_text for name in base_names) or any(name and name in base_text for name in candidate_names)
+
+
 def read_video_status():
-    data = read_json_file(VIDEO_STATUS_FILE, {})
-    return data if isinstance(data, dict) else {}
+    base = read_json_file(VIDEO_STATUS_FILE, {})
+    base = base if isinstance(base, dict) else {}
+    base_mtime = video_status_file_mtime(VIDEO_STATUS_FILE)
+    if base:
+        base['_status_source'] = str(VIDEO_STATUS_FILE)
+        base['_status_mtime'] = base_mtime
+        base['_status_source_kind'] = 'project'
+
+    newest_external = {}
+    newest_external_mtime = 0
+    for fpath in configured_video_status_files():
+        data = read_json_file(fpath, {})
+        if not isinstance(data, dict) or not data:
+            continue
+        mtime = video_status_file_mtime(fpath)
+        if mtime >= newest_external_mtime:
+            newest_external_mtime = mtime
+            newest_external = {
+                **data,
+                '_status_source': str(fpath),
+                '_status_mtime': mtime,
+                '_status_source_kind': 'legacy',
+            }
+
+    external_has_progress = newest_external.get('task') or newest_external.get('progress_pct') is not None
+    same_source = video_status_refers_to_same_source(base, newest_external) if base and newest_external else False
+    base_waiting_for_runner = base.get('status') in ('idle', 'requested', 'active', None, '')
+    external_recent_enough = newest_external_mtime >= max(base_mtime - 2, 0)
+    if newest_external and (not base or newest_external_mtime >= base_mtime or (external_has_progress and same_source and base_waiting_for_runner and external_recent_enough)):
+        merged = {**base, **newest_external}
+        return normalize_legacy_video_status(merged, legacy_source=True)
+
+    return normalize_legacy_video_status(base, legacy_source=False)
 
 
 def normalize_video_process_id(value):
@@ -693,6 +843,40 @@ def video_status_payload():
         'updated_at': '',
     }
     status.update(read_video_status())
+    latest_video_task = {}
+    try:
+        task_matches = find_video_task_files()
+        latest_video_task = task_matches[0][1] if task_matches else {}
+    except Exception:
+        latest_video_task = {}
+    if latest_video_task:
+        task_active = latest_video_task.get('status') in ('pending', 'active') or task_process_alive(latest_video_task)
+        try:
+            runner_progress = int(latest_video_task.get('progress') or 0)
+        except (TypeError, ValueError):
+            runner_progress = 0
+        status['runner_task'] = {
+            'id': latest_video_task.get('id'),
+            'title': latest_video_task.get('title'),
+            'status': latest_video_task.get('status'),
+            'status_label': latest_video_task.get('statusLbl'),
+            'progress': runner_progress,
+            'pid': latest_video_task.get('pid'),
+            'active': bool(task_active),
+        }
+        if task_active and status.get('status') in ('idle', 'requested', None, ''):
+            status['status'] = 'active'
+            status['message'] = status.get('message') or 'CLI 에이전트는 실행 중입니다. 영상 처리 세부 진행률을 기다리는 중입니다.'
+            current_process = infer_current_video_process(status) or VIDEO_PROCESS_STEPS[0]['id']
+            process_status = status.get('process_status') if isinstance(status.get('process_status'), dict) else {}
+            current_info = process_status.get(current_process) if isinstance(process_status.get(current_process), dict) else {}
+            process_status[current_process] = {
+                **current_info,
+                'status': current_info.get('status') or 'active',
+                'progress': current_info.get('progress', status.get('progress') or 0),
+                'message': current_info.get('message') or '세부 진행률 수신 대기',
+            }
+            status['process_status'] = process_status
     if not status.get('total_files') and status.get('total'):
         status['total_files'] = status.get('total') or 0
     if not status.get('completed_files') and isinstance(status.get('completed'), list):
@@ -2677,6 +2861,7 @@ def create_video_encoding_task(data):
 - ffmpeg, faster-whisper large-v3, pyannote diarization, subtitle burn-in, final encode 관련 실행 가능성을 확인하세요.
 - 실행 가능한 파이프라인이 없으면 임의 완료 처리하지 말고 필요한 스크립트/의존성/명령을 결과에 명확히 보고하세요.
 - 진행 중에는 video_status.json을 갱신하세요. 형식은 status(active|requested|waiting_preview_review|done|error), progress, current_file, batch_progress, total_files, completed_files, current_process, current_process_label, process_status, message, speaker_count 입니다.
+- 기존 영상편집에이전트가 C:\\Users\\wnsdu\\OneDrive\\대시보드\\video_status.json에 진행률을 쓰는 경우도 대시보드가 읽습니다. 가능하면 프로젝트 루트의 video_status.json을 직접 갱신하고, 기존 스크립트를 쓰면 해당 legacy 상태 파일도 계속 갱신되게 두세요.
 - 모델 다운로드 중에는 model_download.name, model_download.status, model_download.progress를 갱신하세요.
 - 현재 사용 중인 모델은 model_status.active_model, model_status.device, model_status.compute, model_status.task로 남기세요.
 - 각 프로세스 산출물은 process_results.<process_id> 또는 artifacts에 파일 경로와 설명을 남기세요. 대시보드에서 프로세스를 클릭하면 이 값들이 표시됩니다.
