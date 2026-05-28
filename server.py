@@ -19,6 +19,7 @@ PROCESSED_FILE = ROOT / '처리관리' / '녹음' / 'plaud_processed.json'
 TRANSCRIPTS_DIR = ROOT / '처리관리' / '녹음' / 'transcripts'
 CALENDAR_FILE = ROOT / '처리관리' / 'calendar_events.json'
 LOCAL_SETTINGS_FILE = ROOT / '처리관리' / 'local_settings.json'
+VIDEO_EXTENSIONS = {'.mp4', '.mov', '.mkv', '.avi', '.webm', '.m4v', '.mts', '.m2ts'}
 
 DEFAULT_CATEGORIES = [
     {'id': 'phrase-edit', 'name': '문구수정', 'color': 'blue', 'keywords': ['문구', '결과지', '카피', '표현', '윤문', 'revise', 'phrase']},
@@ -104,6 +105,146 @@ def local_ipv4_addresses():
     except Exception:
         pass
     return sorted(addresses)
+
+
+def video_browser_roots():
+    settings = read_local_settings()
+    video_settings = settings.get('video') if isinstance(settings.get('video'), dict) else {}
+    roots = []
+    seen = set()
+
+    def add_root(label, path_value):
+        if not path_value:
+            return
+        try:
+            path = pathlib.Path(str(path_value)).expanduser()
+            resolved = path.resolve()
+            key = str(resolved).lower()
+            if key in seen or not resolved.exists():
+                return
+            seen.add(key)
+            roots.append({
+                'type': 'folder',
+                'name': label,
+                'path': str(resolved),
+                'meta': str(resolved),
+            })
+        except Exception:
+            return
+
+    source_dirs = video_settings.get('source_dirs') if isinstance(video_settings.get('source_dirs'), list) else []
+    for idx, source_dir in enumerate(source_dirs, start=1):
+        add_root(f'영상 소스 {idx}', source_dir)
+    add_root('영상 작업 폴더', video_settings.get('workspace_dir'))
+    add_root('렌더 출력 폴더', video_settings.get('render_output_dir'))
+
+    home = pathlib.Path.home()
+    add_root('내 동영상', home / 'Videos')
+    add_root('바탕화면', home / 'Desktop')
+    add_root('다운로드', home / 'Downloads')
+
+    if os.name == 'nt':
+        for letter in 'CDEFGHIJKLMNOPQRSTUVWXYZ':
+            add_root(f'{letter}: 드라이브', f'{letter}:\\')
+    else:
+        add_root('파일 시스템', '/')
+
+    return roots
+
+
+def safe_file_meta(path):
+    try:
+        stat = path.stat()
+        return {
+            'size': stat.st_size,
+            'modified': datetime.fromtimestamp(stat.st_mtime).isoformat(),
+        }
+    except Exception:
+        return {'size': 0, 'modified': ''}
+
+
+def browse_video_files(raw_path=''):
+    raw_path = str(raw_path or '').strip()
+    if not raw_path:
+        return {
+            'ok': True,
+            'mode': 'roots',
+            'current': '',
+            'parent': '',
+            'items': video_browser_roots(),
+            'extensions': sorted(VIDEO_EXTENSIONS),
+        }
+
+    try:
+        target = pathlib.Path(raw_path).expanduser().resolve()
+    except Exception as exc:
+        return {'ok': False, 'error': f'경로를 해석할 수 없습니다: {exc}', 'items': []}
+
+    if not target.exists():
+        return {'ok': False, 'error': '해당 경로가 존재하지 않습니다.', 'current': str(target), 'items': []}
+
+    selected_file = ''
+    if target.is_file():
+        selected_file = str(target)
+        target = target.parent
+
+    if not target.is_dir():
+        return {'ok': False, 'error': '폴더를 열 수 없습니다.', 'current': str(target), 'items': []}
+
+    items = []
+    try:
+        children = list(target.iterdir())
+    except Exception as exc:
+        return {'ok': False, 'error': f'폴더 목록을 읽을 수 없습니다: {exc}', 'current': str(target), 'items': []}
+
+    directories = []
+    files = []
+    for child in children:
+        name = child.name
+        if name.startswith('$') or name.startswith('.') or name in {'System Volume Information', '$RECYCLE.BIN'}:
+            continue
+        try:
+            if child.is_dir():
+                meta = safe_file_meta(child)
+                directories.append({
+                    'type': 'folder',
+                    'name': name,
+                    'path': str(child),
+                    'meta': '폴더',
+                    **meta,
+                })
+            elif child.is_file() and child.suffix.lower() in VIDEO_EXTENSIONS:
+                meta = safe_file_meta(child)
+                files.append({
+                    'type': 'file',
+                    'name': name,
+                    'path': str(child),
+                    'meta': child.suffix.lower().lstrip('.').upper(),
+                    **meta,
+                })
+        except Exception:
+            continue
+
+    directories.sort(key=lambda item: item['name'].lower())
+    files.sort(key=lambda item: item['name'].lower())
+    items = (directories + files)[:1000]
+
+    parent = ''
+    try:
+        if target.parent != target:
+            parent = str(target.parent)
+    except Exception:
+        parent = ''
+
+    return {
+        'ok': True,
+        'mode': 'browse',
+        'current': str(target),
+        'parent': parent,
+        'selected': selected_file,
+        'items': items,
+        'extensions': sorted(VIDEO_EXTENSIONS),
+    }
 
 
 def normalize_category_id(name):
@@ -1988,6 +2129,11 @@ class CrataHandler(BaseHTTPRequestHandler):
 
         elif path == '/api/calendar':
             self.send_json_or_jsonp(read_calendar_state(), parsed.query)
+
+        elif path == '/api/video/browse':
+            query = parse_qs(parsed.query)
+            browse_path = (query.get('path') or [''])[0]
+            self.send_json_or_jsonp(browse_video_files(browse_path), parsed.query)
 
         elif path.startswith('/api/action/'):
             payload = (parse_qs(parsed.query).get('payload') or ['{}'])[0]

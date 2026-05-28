@@ -6100,11 +6100,14 @@ body {
         <div class="card-title" style="margin-bottom: 10px;">새로운 인코딩 태스크 요청</div>
         <div style="display: flex; flex-direction: column; gap: 10px;">
           <!-- 경로 입력 -->
-          <div style="display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center;">
+          <div style="display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 12px; align-items: center;">
             <div style="position: relative; display: flex; align-items: center;">
               <span style="position: absolute; left: 12px; font-family: var(--font-mono); color: var(--text-muted); font-size: 13px;">$</span>
               <input type="text" id="video-path-input" placeholder="데스크탑 서버의 영상 폴더 또는 파일 경로... (예: D:/CRATA_Video_Work/source)" style="width: 100%; padding: 10px 14px 10px 28px; border-radius: var(--radius-md); background: var(--bg-input); border: 1px solid var(--border); color: var(--text-white); font-size: 13px; font-family: var(--font-mono); outline: none; transition: var(--transition);" onfocus="this.style.borderColor='var(--border-focus)'; this.style.backgroundColor='var(--bg-input-focus)'" onblur="this.style.borderColor='var(--border)'; this.style.backgroundColor='var(--bg-input)'">
             </div>
+            <button onclick="openVideoBrowser('video-path-input')" style="padding: 10px 14px; border-radius: var(--radius-md); background: var(--bg-input); border: 1px solid var(--border); color: var(--text-hover); font-size: 13px; font-weight: 700; cursor: pointer; transition: var(--transition); white-space: nowrap;">
+              데스크탑에서 선택
+            </button>
             <button onclick="startVideoEncoding()" style="padding: 10px 20px; border-radius: var(--radius-md); background: var(--green); border: none; color: var(--bg); font-size: 13.5px; font-weight: 700; cursor: pointer; transition: var(--transition); display: flex; align-items: center; gap: 8px;">
               인코딩 시작 <span>▶</span>
             </button>
@@ -6140,11 +6143,11 @@ body {
             </div>
 
             <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 11.5px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">인코딩 프리셋:</span>
+              <span style="font-size: 11.5px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">출력 품질/용도:</span>
               <select id="video-preset-select" style="background: var(--bg-input); border: 1px solid var(--border); color: var(--text-white); font-size: 12px; padding: 4px 8px; border-radius: var(--radius-sm); outline: none;">
-                <option value="fast">고속 (H.264 Fast 1080p)</option>
-                <option value="high">고화질 (ProRes HQ 422)</option>
-                <option value="archive">아카이브용 저용량 (HEVC Main10)</option>
+                <option value="fast">빠른 확인용 - H.264 1080p</option>
+                <option value="high">최종 납품용 - 고화질 ProRes</option>
+                <option value="archive">보관/공유용 - 저용량 HEVC</option>
               </select>
             </div>
           </div>
@@ -6256,6 +6259,27 @@ body {
 
     </div>
 
+    <div id="video-browser-modal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.72); backdrop-filter:blur(10px); align-items:center; justify-content:center; padding:24px;">
+      <div style="width:min(920px, 94vw); max-height:84vh; background:var(--bg-panel); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); display:flex; flex-direction:column; overflow:hidden;">
+        <div style="padding:16px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <div>
+            <div style="font-size:16px; font-weight:800; color:var(--text-white);">데스크탑 영상 파일 선택</div>
+            <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">현재 접속한 브라우저가 아니라 데스크탑 서버의 폴더와 영상 파일을 고릅니다.</div>
+          </div>
+          <button onclick="closeVideoBrowser()" style="width:34px;height:34px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-input);color:var(--text-hover);cursor:pointer;font-size:18px;">×</button>
+        </div>
+        <div style="padding:12px 18px; border-bottom:1px solid var(--border); display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:center;">
+          <button id="video-browser-up" onclick="videoBrowserUp()" style="padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-input);color:var(--text-hover);cursor:pointer;">상위</button>
+          <div id="video-browser-current" style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:8px 10px; border:1px solid var(--border); border-radius:var(--radius-sm); background:rgba(255,255,255,0.02); font-family:var(--font-mono); font-size:12px; color:var(--text);">빠른 위치</div>
+          <button id="video-browser-choose-folder" onclick="chooseCurrentVideoFolder()" style="padding:8px 12px;border-radius:var(--radius-sm);border:1px solid rgba(var(--accent-rgb),0.35);background:rgba(var(--accent-rgb),0.12);color:var(--text-white);font-weight:700;cursor:pointer;">현재 폴더 선택</button>
+        </div>
+        <div id="video-browser-list" style="padding:10px; overflow:auto; max-height:58vh; display:flex; flex-direction:column; gap:6px;"></div>
+        <div style="padding:10px 18px; border-top:1px solid var(--border); color:var(--text-muted); font-size:11.5px;">
+          표시 파일: mp4, mov, mkv, avi, webm, m4v, mts, m2ts. 폴더를 선택하면 하위 영상 전체를 처리하고, 파일을 선택하면 해당 영상 하나만 처리합니다.
+        </div>
+      </div>
+    </div>
+
     <!-- ── 7-1. VIDEO EDIT PAGE ── -->
     <div class="page" id="page-video-edit">
       <div style="margin-bottom: 24px;">
@@ -6268,9 +6292,12 @@ body {
           <!-- 대상 영상 경로 -->
           <div>
             <span style="font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 8px;">대상 영상/폴더 경로 (Source Path)</span>
-            <div style="position: relative; display: flex; align-items: center;">
-              <span style="position: absolute; left: 12px; font-family: var(--font-mono); color: var(--text-muted); font-size: 12px;">$</span>
-              <input type="text" id="video-edit-path-input" value="C:/CRATA_Assets/Video/2026_05" placeholder="소스 폴더 또는 파일 경로..." style="width: 100%; padding: 8px 12px 8px 24px; border-radius: var(--radius-sm); background: var(--bg-input); border: 1px solid var(--border); color: var(--text-white); font-size: 12px; font-family: var(--font-mono); outline: none; transition: var(--transition);" oninput="updateCliCommand()" onfocus="this.style.borderColor='var(--border-focus)'; this.style.backgroundColor='var(--bg-input-focus)'" onblur="this.style.borderColor='var(--border)'; this.style.backgroundColor='var(--bg-input)'">
+            <div style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:center;">
+              <div style="position: relative; display: flex; align-items: center;">
+                <span style="position: absolute; left: 12px; font-family: var(--font-mono); color: var(--text-muted); font-size: 12px;">$</span>
+                <input type="text" id="video-edit-path-input" value="C:/CRATA_Assets/Video/2026_05" placeholder="소스 폴더 또는 파일 경로..." style="width: 100%; padding: 8px 12px 8px 24px; border-radius: var(--radius-sm); background: var(--bg-input); border: 1px solid var(--border); color: var(--text-white); font-size: 12px; font-family: var(--font-mono); outline: none; transition: var(--transition);" oninput="updateCliCommand()" onfocus="this.style.borderColor='var(--border-focus)'; this.style.backgroundColor='var(--bg-input-focus)'" onblur="this.style.borderColor='var(--border)'; this.style.backgroundColor='var(--bg-input)'">
+              </div>
+              <button onclick="openVideoBrowser('video-edit-path-input')" style="padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-input);color:var(--text-hover);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">선택</button>
             </div>
           </div>
 
@@ -10829,6 +10856,103 @@ function triggerExportReview() {
 
 
 // --- 7. VIDEO PAGE - POLLING AND SIMULATION ---
+let videoBrowserTargetInputId = 'video-path-input';
+let videoBrowserCurrentPath = '';
+let videoBrowserParentPath = '';
+
+function videoFileSizeLabel(bytes) {
+  const size = Number(bytes || 0);
+  if (!size) return '';
+  if (size >= 1024 * 1024 * 1024) return `${(size / 1024 / 1024 / 1024).toFixed(1)}GB`;
+  if (size >= 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)}MB`;
+  return `${Math.max(1, Math.round(size / 1024))}KB`;
+}
+
+function openVideoBrowser(targetInputId = 'video-path-input') {
+  videoBrowserTargetInputId = targetInputId;
+  const modal = document.getElementById('video-browser-modal');
+  if (modal) modal.style.display = 'flex';
+  const startPath = document.getElementById(targetInputId)?.value.trim() || '';
+  loadVideoBrowser(startPath);
+}
+
+function closeVideoBrowser() {
+  const modal = document.getElementById('video-browser-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function loadVideoBrowser(path = '') {
+  const list = document.getElementById('video-browser-list');
+  const current = document.getElementById('video-browser-current');
+  const chooseFolder = document.getElementById('video-browser-choose-folder');
+  const up = document.getElementById('video-browser-up');
+  if (!list) return;
+
+  list.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px;">데스크탑 폴더 목록을 불러오는 중입니다.</div>';
+
+  try {
+    const res = await fetchWithTimeout(`${SERVER_URL}/api/video/browse?path=${encodeURIComponent(path || '')}`, {}, 10000);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || '폴더 목록을 읽지 못했습니다.');
+
+    videoBrowserCurrentPath = data.current || '';
+    videoBrowserParentPath = data.parent || '';
+    if (current) current.textContent = videoBrowserCurrentPath || '빠른 위치';
+    if (chooseFolder) chooseFolder.disabled = !videoBrowserCurrentPath;
+    if (up) up.disabled = !videoBrowserParentPath && data.mode !== 'browse';
+
+    if (!Array.isArray(data.items) || !data.items.length) {
+      list.innerHTML = '<div style="padding:28px;text-align:center;color:var(--text-muted);font-size:13px;">이 위치에는 선택 가능한 영상 파일이 없습니다.</div>';
+      return;
+    }
+
+    list.innerHTML = data.items.map(item => {
+      const isFolder = item.type === 'folder';
+      const icon = isFolder ? '▣' : '▶';
+      const action = isFolder
+        ? `loadVideoBrowser('${escapeHtml(escapeJs(item.path))}')`
+        : `chooseVideoPath('${escapeHtml(escapeJs(item.path))}')`;
+      const meta = isFolder
+        ? (item.meta || '폴더')
+        : [item.meta || '영상', videoFileSizeLabel(item.size)].filter(Boolean).join(' · ');
+      return `
+        <button onclick="${action}" style="width:100%; display:grid; grid-template-columns:26px minmax(0,1fr) auto; gap:10px; align-items:center; text-align:left; padding:10px 12px; border-radius:var(--radius-md); border:1px solid var(--border); background:rgba(255,255,255,0.018); color:var(--text); cursor:pointer;">
+          <span style="color:${isFolder ? 'var(--accent)' : 'var(--green)'}; font-size:13px;">${icon}</span>
+          <span style="min-width:0;">
+            <span style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-white); font-size:13px; font-weight:700;">${escapeHtml(item.name)}</span>
+            <span style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-muted); font-size:11.5px; margin-top:2px; font-family:var(--font-mono);">${escapeHtml(item.path)}</span>
+          </span>
+          <span style="font-size:11.5px; color:var(--text-muted); white-space:nowrap;">${escapeHtml(meta)}</span>
+        </button>
+      `;
+    }).join('');
+  } catch (error) {
+    list.innerHTML = `<div style="padding:24px;text-align:center;color:var(--red);font-size:13px;">${escapeHtml(error.message || '폴더 목록을 불러오지 못했습니다.')}</div>`;
+  }
+}
+
+function videoBrowserUp() {
+  if (videoBrowserParentPath) {
+    loadVideoBrowser(videoBrowserParentPath);
+  } else {
+    loadVideoBrowser('');
+  }
+}
+
+function chooseCurrentVideoFolder() {
+  if (videoBrowserCurrentPath) chooseVideoPath(videoBrowserCurrentPath);
+}
+
+function chooseVideoPath(path) {
+  const input = document.getElementById(videoBrowserTargetInputId);
+  if (input) {
+    input.value = path;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  updateCliCommand();
+  closeVideoBrowser();
+  showToast('데스크탑 영상 경로를 선택했습니다.', 'success');
+}
 
 // Real Polling from backend json (if running locally on webserver)
 function pollVideoStatus() {
