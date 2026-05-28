@@ -1578,6 +1578,126 @@ def task_process_alive(task):
         return False
 
 
+def terminate_process_tree(pid):
+    try:
+        pid = int(pid)
+    except (TypeError, ValueError):
+        return False, 'PID가 없습니다.'
+    if pid <= 0:
+        return False, 'PID가 올바르지 않습니다.'
+
+    try:
+        if os.name == 'nt':
+            proc = subprocess.run(
+                ['taskkill', '/PID', str(pid), '/T', '/F'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=8,
+                creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
+            )
+            output = (proc.stdout or '').strip()
+            return proc.returncode == 0, output or f'taskkill 종료 코드 {proc.returncode}'
+        os.kill(pid, 15)
+        return True, f'PID {pid} 종료 신호를 보냈습니다.'
+    except ProcessLookupError:
+        return True, f'PID {pid}는 이미 종료되었습니다.'
+    except Exception as exc:
+        return False, str(exc)
+
+
+def task_is_cancelled(fpath):
+    try:
+        task = read_json_file(fpath, {})
+        return task.get('status') == 'cancelled'
+    except Exception:
+        return False
+
+
+def find_video_task_files(task_id=''):
+    inbox_dir = ROOT / '처리관리' / 'inbox'
+    if not inbox_dir.exists():
+        return []
+    matches = []
+    for fpath in inbox_dir.glob('task_*.json'):
+        task = read_json_file(fpath, {})
+        if task.get('type') != 'video_encoding':
+            continue
+        if task_id and str(task.get('id') or '') != str(task_id):
+            continue
+        matches.append((fpath, task))
+    matches.sort(key=lambda item: task_sort_stamp(item[1]), reverse=True)
+    return matches
+
+
+def cancel_video_encoding_task(data=None):
+    data = data or {}
+    task_id = str(data.get('taskId') or data.get('task_id') or '').strip()
+    candidates = find_video_task_files(task_id)
+    if not candidates:
+        return {'ok': False, 'error': '중지할 영상 작업을 찾지 못했습니다.'}
+
+    selected = []
+    for fpath, task in candidates:
+        activeish = task.get('status') in ('pending', 'active') or task_process_alive(task)
+        if task_id or activeish:
+            selected.append((fpath, task))
+        if selected and not task_id:
+            break
+
+    if not selected:
+        return {'ok': False, 'error': '진행 중인 영상 작업이 없습니다.'}
+
+    stopped = []
+    errors = []
+    for fpath, task in selected:
+        pid = task.get('pid')
+        killed = False
+        kill_message = '실행 중인 PID 없음'
+        if pid:
+            killed, kill_message = terminate_process_tree(pid)
+            if not killed:
+                errors.append({'task': task.get('id'), 'pid': pid, 'error': kill_message})
+
+        cancelled_task = update_task_file(fpath, lambda t, killed=killed, kill_message=kill_message: (
+            t.update({
+                'status': 'cancelled',
+                'statusLbl': '중지됨',
+                'progress': int(t.get('progress') or 0),
+                'cancelled_at': now_iso(),
+                'cancel_reason': data.get('reason') or '사용자 요청',
+                'result': (t.get('result') or '') + '\n\n[시스템] 사용자 요청으로 영상 작업을 중지했습니다.',
+                'runner': {**(t.get('runner') or {}), 'cancelled': True},
+            }),
+            append_task_log(t, '시스템', f'사용자 요청으로 작업을 중지했습니다. {kill_message}')
+        ))
+        stopped.append({'id': cancelled_task.get('id'), 'title': cancelled_task.get('title'), 'pid': pid, 'killed': killed, 'message': kill_message})
+
+    video_status = read_video_status()
+    current_process = infer_current_video_process(video_status) or video_status.get('current_process') or ''
+    if current_process:
+        process_status = video_status.get('process_status') if isinstance(video_status.get('process_status'), dict) else {}
+        current_info = process_status.get(current_process) if isinstance(process_status.get(current_process), dict) else {}
+        process_status[current_process] = {
+            **current_info,
+            'status': 'cancelled',
+            'message': '사용자 요청으로 중지됨',
+        }
+        video_status['process_status'] = process_status
+    video_status.update({
+        'status': 'cancelled',
+        'status_label': '중지됨',
+        'message': '사용자 요청으로 영상 작업을 중지했습니다.',
+        'cancelled_at': now_iso(),
+        'updated_at': now_iso(),
+    })
+    write_json_file(VIDEO_STATUS_FILE, video_status)
+
+    return {'ok': not errors, 'stopped': stopped, 'errors': errors, 'videoStatus': video_status_payload()}
+
+
 def find_existing_task_file(task):
     inbox_dir = ROOT / '처리관리' / 'inbox'
     target_key = task_identity_key(task)
@@ -1672,6 +1792,8 @@ def extract_stream_text(event):
 
 
 def run_codex_task(fpath, claude_error='', claude_output='', fallback=False):
+    if task_is_cancelled(fpath):
+        return
     codex_cmd = resolve_codex_command()
     started = time.time()
     output_parts = []
@@ -1762,6 +1884,9 @@ def run_codex_task(fpath, claude_error='', claude_output='', fallback=False):
         t.update({'pid': proc.pid, 'progress': max(int(t.get('progress') or 0), 65)}),
         append_task_log(t, '시스템', f'Codex 프로세스 PID {proc.pid}로 실행 중입니다.')
     ))
+    if task_is_cancelled(fpath):
+        terminate_process_tree(proc.pid)
+        return
 
     last_flush = 0
     for line in proc.stdout or []:
@@ -1799,6 +1924,9 @@ def run_codex_task(fpath, claude_error='', claude_output='', fallback=False):
             result_file.unlink()
         except Exception:
             pass
+
+    if task_is_cancelled(fpath):
+        return
 
     if return_code == 0:
         update_task_file(fpath, lambda t: (
@@ -1844,6 +1972,8 @@ def run_codex_fallback_task(fpath, claude_error='', claude_output=''):
 
 
 def run_claude_task(fpath):
+    if task_is_cancelled(fpath):
+        return
     claude_cmd = resolve_claude_command()
     started = time.time()
     output_parts = []
@@ -1924,6 +2054,9 @@ def run_claude_task(fpath):
         t.update({'pid': proc.pid, 'progress': 25}),
         append_task_log(t, '시스템', f'프로세스 PID {proc.pid}로 실행 중입니다.')
     ))
+    if task_is_cancelled(fpath):
+        terminate_process_tree(proc.pid)
+        return
 
     for line in proc.stdout or []:
         line = line.strip()
@@ -1966,6 +2099,9 @@ def run_claude_task(fpath):
     return_code = proc.wait()
     elapsed = max(time.time() - started, 0.1)
     final_output = ''.join(output_parts).strip()
+
+    if task_is_cancelled(fpath):
+        return
 
     if return_code == 0:
         update_task_file(fpath, lambda t: (
@@ -2987,6 +3123,8 @@ def handle_action(action, data):
         return create_meeting_process_task(data)
     if action == 'video/encoding/start':
         return create_video_encoding_task(data)
+    if action == 'video/encoding/cancel':
+        return cancel_video_encoding_task(data)
     if action == 'calendar':
         return save_calendar_event(data)
     if action == 'calendar/parse':
@@ -3238,6 +3376,9 @@ class CrataHandler(BaseHTTPRequestHandler):
 
         elif path == '/api/video/encoding/start':
             self.send_json(create_video_encoding_task(data))
+
+        elif path == '/api/video/encoding/cancel':
+            self.send_json(cancel_video_encoding_task(data))
 
         elif path == '/api/video/edit':
             self.send_json(save_video_edit_action(data))

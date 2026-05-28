@@ -6178,7 +6178,10 @@ body {
             <div class="card-title" style="margin-bottom:4px;">현재 영상 작업</div>
             <div id="video-process-headline" style="font-size:12px;color:var(--text-muted);">작업 요청 대기 중</div>
           </div>
-          <span style="font-size:11px;font-family:var(--font-mono);color:var(--text-muted);padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:var(--bg-input);white-space:nowrap;" id="video-current-status-lbl">대기</span>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+            <span style="font-size:11px;font-family:var(--font-mono);color:var(--text-muted);padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:var(--bg-input);white-space:nowrap;" id="video-current-status-lbl">대기</span>
+            <button id="video-cancel-btn" onclick="cancelVideoEncoding()" style="display:none;padding:6px 10px;border-radius:var(--radius-sm);border:1px solid rgba(239,68,68,0.35);background:rgba(239,68,68,0.12);color:#fecaca;font-size:11.5px;font-weight:800;cursor:pointer;">작업 중지</button>
+          </div>
         </div>
 
         <div style="display:grid;grid-template-columns:minmax(220px,0.8fr) minmax(260px,1.2fr) minmax(260px,1fr);gap:10px;margin-bottom:10px;">
@@ -11458,6 +11461,7 @@ function processStateLabel(state) {
   if (state === 'active') return '진행 중';
   if (state === 'waiting') return '확인 대기';
   if (state === 'error') return '오류';
+  if (state === 'cancelled') return '중지됨';
   return '대기';
 }
 
@@ -11541,6 +11545,7 @@ function renderVideoProcessFlow(data, totalCount, completedCount) {
   const status = data?.status || 'idle';
   const waitingPreview = status === 'waiting_preview_review';
   const doneAll = status === 'done' || status === 'completed';
+  const cancelledAll = status === 'cancelled';
   const processStatus = data?.process_status && typeof data.process_status === 'object' ? data.process_status : {};
 
   const activeStep = steps[currentIndex] || null;
@@ -11561,7 +11566,8 @@ function renderVideoProcessFlow(data, totalCount, completedCount) {
     const explicitState = processStatus[step.id]?.status || step.status || '';
     let state = explicitState;
     if (!state) {
-      if (doneAll || (currentIndex >= 0 && index < currentIndex)) state = 'done';
+      if (cancelledAll && index === currentIndex) state = 'cancelled';
+      else if (doneAll || (currentIndex >= 0 && index < currentIndex)) state = 'done';
       else if (index === currentIndex) state = waitingPreview ? 'waiting' : 'active';
       else state = 'pending';
     }
@@ -11574,13 +11580,17 @@ function renderVideoProcessFlow(data, totalCount, completedCount) {
           ? 'rgba(59,130,246,0.42)'
           : state === 'error'
             ? 'rgba(239,68,68,0.42)'
+            : state === 'cancelled'
+              ? 'rgba(239,68,68,0.34)'
             : 'var(--border)';
     const bg = state === 'done'
       ? 'rgba(16,185,129,0.06)'
       : state === 'active'
         ? 'rgba(245,158,11,0.06)'
-        : state === 'waiting'
-          ? 'rgba(59,130,246,0.07)'
+          : state === 'waiting'
+            ? 'rgba(59,130,246,0.07)'
+            : state === 'cancelled'
+              ? 'rgba(239,68,68,0.06)'
           : 'rgba(255,255,255,0.012)';
     const dot = state === 'done'
       ? 'var(--green)'
@@ -11590,6 +11600,8 @@ function renderVideoProcessFlow(data, totalCount, completedCount) {
           ? 'var(--blue)'
           : state === 'error'
             ? 'var(--red)'
+            : state === 'cancelled'
+              ? 'var(--red)'
             : 'var(--text-muted)';
     const fraction = `${Math.round(Math.max(0, Math.min(100, stepProgress)))}%`;
     const selected = selectedVideoProcessId === step.id;
@@ -11703,6 +11715,7 @@ function pollVideoStatus() {
 function updateVideoUI(data) {
   latestVideoStatusData = data || {};
   const currentStatusLbl = document.getElementById('video-current-status-lbl');
+  const cancelBtn = document.getElementById('video-cancel-btn');
   const singlePct = document.getElementById('video-single-pct');
   const singleBar = document.getElementById('video-single-bar');
   const currentFileName = document.getElementById('video-current-file-name');
@@ -11731,7 +11744,15 @@ function updateVideoUI(data) {
     ? '가공 중'
     : (status === 'requested'
       ? '요청됨'
-      : (status === 'waiting_preview_review' ? '미리보기 확인 대기' : (status === 'done' || status === 'completed' ? '완료' : '대기')));
+      : (status === 'waiting_preview_review'
+        ? '미리보기 확인 대기'
+        : (status === 'cancelled' ? '중지됨' : (status === 'done' || status === 'completed' ? '완료' : '대기'))));
+  if (cancelBtn) {
+    const cancellable = ['active', 'requested', 'waiting_preview_review'].includes(status);
+    cancelBtn.style.display = cancellable ? 'inline-flex' : 'none';
+    cancelBtn.disabled = !cancellable;
+    cancelBtn.style.opacity = cancellable ? '1' : '0.5';
+  }
   if (singlePct) singlePct.textContent = Math.round(activeProgress);
   if (singleBar) singleBar.style.width = `${Math.max(0, Math.min(100, activeProgress))}%`;
   if (headline) {
@@ -11768,6 +11789,12 @@ function updateVideoUI(data) {
       navDot.style.boxShadow = '0 0 8px var(--green)';
     }
     if (elapsedLbl) elapsedLbl.textContent = '영상 작업이 완료되었습니다.';
+  } else if (status === 'cancelled') {
+    if (navDot) {
+      navDot.style.backgroundColor = 'var(--red)';
+      navDot.style.boxShadow = '0 0 8px var(--red)';
+    }
+    if (elapsedLbl) elapsedLbl.textContent = data.message || '영상 작업이 중지되었습니다.';
   } else {
     if (navDot) {
       navDot.style.backgroundColor = 'var(--text-muted)';
@@ -11818,6 +11845,38 @@ function selectedVideoEncodingSteps() {
     selected.splice(Math.max(insertAt, 0), 0, { id: 'preview', label: '미리보기 검수' });
   }
   return selected;
+}
+
+async function cancelVideoEncoding() {
+  const btn = document.getElementById('video-cancel-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '중지 중...';
+  }
+  showToast('영상 작업 중지를 요청합니다. 실행 중인 하위 프로세스까지 종료합니다.', 'info');
+  try {
+    const saved = await postToServer('/api/video/encoding/cancel', {
+      reason: 'dashboard_cancel',
+    }, 20000);
+    if (!saved?.ok) {
+      showToast(saved?.error || '중지할 영상 작업을 찾지 못했습니다.', 'warning');
+      return;
+    }
+    updateVideoUI(saved.videoStatus || {
+      ...(latestVideoStatusData || {}),
+      status: 'cancelled',
+      message: '사용자 요청으로 영상 작업을 중지했습니다.',
+    });
+    showToast('영상 작업을 중지했습니다.', 'success');
+    setTimeout(fetchRealData, 1000);
+  } catch (error) {
+    showToast(error.message || '영상 작업 중지 중 오류가 발생했습니다.', 'warning');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '작업 중지';
+    }
+  }
 }
 
 // Register a real CLI task. The old fake progress simulation was intentionally removed.
