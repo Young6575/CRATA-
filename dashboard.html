@@ -6498,21 +6498,27 @@ async function runSystemUpdate() {
   try {
     const result = await postToServer('/api/system/update', {}, 240000);
     if (!result || !result.ok) {
-      showToast(result?.error || '업데이트 확인에 실패했습니다.', 'warning');
+      const localFiles = Array.isArray(result?.local_change_files) && result.local_change_files.length
+        ? ` (${result.local_change_files.slice(0, 3).join(', ')}${result.local_change_files.length > 3 ? ' 외' : ''})`
+        : '';
+      showToast(`${result?.error || '업데이트 확인에 실패했습니다.'}${localFiles}`, 'warning');
       return;
     }
     if (!result.updated) {
-      showToast('이미 최신 상태입니다.', 'success');
+      showToast(result.local_changes_autostashed ? '로컬 수정은 유지했고 이미 최신 상태입니다.' : '이미 최신 상태입니다.', 'success');
       return;
     }
     const changedCount = Array.isArray(result.changed_files) ? result.changed_files.length : 0;
     if (result.server_restart_required) {
-      showToast(`업데이트 ${changedCount}개 적용됨. 서버 재시작이 필요합니다.`, 'warning');
+      const localNote = result.local_changes_autostashed ? ' 로컬 수정은 보관 후 다시 적용했습니다.' : '';
+      showToast(`업데이트 ${changedCount}개 적용됨. 서버 재시작이 필요합니다.${localNote}`, 'warning');
     } else if (result.browser_reload_required) {
-      showToast(`업데이트 ${changedCount}개 적용됨. 화면을 새로고침합니다.`, 'success');
+      const localNote = result.local_changes_autostashed ? ' 로컬 수정은 유지했습니다.' : '';
+      showToast(`업데이트 ${changedCount}개 적용됨. 화면을 새로고침합니다.${localNote}`, 'success');
       setTimeout(() => window.location.reload(), 1200);
     } else {
-      showToast(`업데이트 ${changedCount}개 적용됨.`, 'success');
+      const localNote = result.local_changes_autostashed ? ' 로컬 수정은 유지했습니다.' : '';
+      showToast(`업데이트 ${changedCount}개 적용됨.${localNote}`, 'success');
       fetchRealData();
     }
   } catch (error) {

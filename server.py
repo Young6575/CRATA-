@@ -132,23 +132,29 @@ def update_from_git():
     code, status_out, status_err = run_git_command(['status', '--porcelain', '--untracked-files=no'], timeout=30)
     if code != 0:
         return {'ok': False, 'error': status_err or status_out or 'Git 상태 확인에 실패했습니다.'}
-    if status_out.strip():
-        return {
-            'ok': False,
-            'local_changes': True,
-            'error': '추적 중인 로컬 수정이 있어 자동 업데이트를 중단했습니다.',
-            'details': status_out,
-        }
 
     _, before, _ = run_git_command(['rev-parse', 'HEAD'], timeout=30)
-    code, pull_out, pull_err = run_git_command(['pull', '--ff-only'], timeout=180)
+    local_changes = [line.strip() for line in status_out.splitlines() if line.strip()]
+    pull_args = ['pull', '--ff-only']
+    if local_changes:
+        pull_args.append('--autostash')
+    code, pull_out, pull_err = run_git_command(pull_args, timeout=180)
     _, after, _ = run_git_command(['rev-parse', 'HEAD'], timeout=30)
 
     if code != 0:
+        if local_changes and 'autostash' in (pull_err + pull_out).lower():
+            return {
+                'ok': False,
+                'local_changes': True,
+                'error': '로컬 수정 자동 보관을 지원하지 않는 Git 환경입니다. 데스크탑에서 한 번 수동 업데이트가 필요합니다.',
+                'details': status_out,
+            }
         return {
             'ok': False,
             'error': pull_err or pull_out or 'git pull에 실패했습니다.',
             'details': pull_out,
+            'local_changes': bool(local_changes),
+            'local_change_files': local_changes,
         }
 
     changed_files = []
@@ -171,6 +177,8 @@ def update_from_git():
         'before': before,
         'after': after,
         'changed_files': changed_files,
+        'local_changes_autostashed': bool(local_changes),
+        'local_change_files': local_changes,
         'server_restart_required': server_restart_required,
         'browser_reload_required': browser_reload_required,
         'message': pull_out or 'Already up to date.',
