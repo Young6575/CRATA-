@@ -6429,41 +6429,6 @@ body {
               </select>
             </div>
           </div>
-
-          <div style="border-top:1px solid var(--border);padding-top:12px;display:grid;grid-template-columns:minmax(360px,1fr) minmax(280px,.75fr);gap:14px;align-items:stretch;">
-            <div style="display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px;">
-              <div>
-                <div style="font-size:11px;color:var(--text-muted);font-weight:800;margin-bottom:6px;">자막 크기</div>
-                <input id="subtitle-style-size" type="range" min="36" max="76" value="54" oninput="updateSubtitleStylePreview()" style="width:100%;accent-color:var(--green);">
-                <div id="subtitle-style-size-label" style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);">54</div>
-              </div>
-              <div>
-                <div style="font-size:11px;color:var(--text-muted);font-weight:800;margin-bottom:6px;">외곽선</div>
-                <input id="subtitle-style-outline" type="range" min="1" max="6" step="0.5" value="3" oninput="updateSubtitleStylePreview()" style="width:100%;accent-color:var(--green);">
-                <div id="subtitle-style-outline-label" style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);">3</div>
-              </div>
-              <div>
-                <div style="font-size:11px;color:var(--text-muted);font-weight:800;margin-bottom:6px;">하단 여백</div>
-                <input id="subtitle-style-margin" type="range" min="40" max="130" value="74" oninput="updateSubtitleStylePreview()" style="width:100%;accent-color:var(--green);">
-                <div id="subtitle-style-margin-label" style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);">74</div>
-              </div>
-              <div style="display:flex;flex-direction:column;gap:8px;">
-                <label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text);cursor:pointer;">
-                  <input id="subtitle-style-bold" type="checkbox" checked onchange="updateSubtitleStylePreview()" style="accent-color:var(--green);"> 굵게
-                </label>
-                <button onclick="saveSubtitleStyleDefault()" style="padding:7px 10px;border-radius:var(--radius-sm);border:1px solid rgba(16,185,129,0.35);background:rgba(16,185,129,0.12);color:#bbf7d0;font-size:11.5px;font-weight:800;cursor:pointer;">기본값 저장</button>
-              </div>
-              <div style="grid-column:1/-1;font-size:11.5px;color:var(--text-muted);line-height:1.45;">
-                앞으로 생성되는 자막은 <b style="color:var(--text-hover);">[강사]/[질문자] 없이</b> 흰색 글자로 통일됩니다. 여기서 저장한 스타일을 미리보기와 최종 인코딩에 계속 사용합니다.
-              </div>
-            </div>
-            <div id="subtitle-style-preview-box" style="position:relative;min-height:150px;border:1px solid var(--border);border-radius:var(--radius-md);background:linear-gradient(180deg,#1f2937,#050505);overflow:hidden;">
-              <div style="position:absolute;inset:0;background:linear-gradient(90deg,rgba(255,255,255,0.05),transparent 34%,rgba(255,255,255,0.035));"></div>
-              <div id="subtitle-style-preview-text" style="position:absolute;left:18px;right:18px;text-align:center;color:#fff;font-family:'Malgun Gothic','Noto Sans KR',sans-serif;line-height:1.22;">
-                아이의 성장 흐름을 기준으로<br>현재 필요한 자극을 함께 확인합니다.
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -9235,7 +9200,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (videoPathInput) {
     videoPathInput.addEventListener('input', updateCliCommand);
   }
-  loadSubtitleStyleDefault();
   const videoEditPathInput = document.getElementById('video-edit-path-input');
   if (videoEditPathInput) {
     videoEditPathInput.addEventListener('input', updateCliCommand);
@@ -11757,77 +11721,15 @@ const DEFAULT_VIDEO_SUBTITLE_STYLE = {
 };
 let videoSubtitleStyle = { ...DEFAULT_VIDEO_SUBTITLE_STYLE };
 
-function currentSubtitleStyleFromControls() {
-  return {
+function currentVideoSubtitleStyle() {
+  videoSubtitleStyle = {
     ...DEFAULT_VIDEO_SUBTITLE_STYLE,
-    font_size: Number(document.getElementById('subtitle-style-size')?.value || videoSubtitleStyle.font_size || 54),
-    bold: !!document.getElementById('subtitle-style-bold')?.checked,
-    outline: Number(document.getElementById('subtitle-style-outline')?.value || videoSubtitleStyle.outline || 3),
-    margin_v: Number(document.getElementById('subtitle-style-margin')?.value || videoSubtitleStyle.margin_v || 74),
     primary_color: '#FFFFFF',
     outline_color: '#000000',
     speaker_labels: false,
     speaker_colors: false,
   };
-}
-
-function applySubtitleStyleToControls(style = {}) {
-  videoSubtitleStyle = { ...DEFAULT_VIDEO_SUBTITLE_STYLE, ...style, primary_color: '#FFFFFF', speaker_labels: false, speaker_colors: false };
-  const size = document.getElementById('subtitle-style-size');
-  const bold = document.getElementById('subtitle-style-bold');
-  const outline = document.getElementById('subtitle-style-outline');
-  const margin = document.getElementById('subtitle-style-margin');
-  if (size) size.value = videoSubtitleStyle.font_size;
-  if (bold) bold.checked = !!videoSubtitleStyle.bold;
-  if (outline) outline.value = videoSubtitleStyle.outline;
-  if (margin) margin.value = videoSubtitleStyle.margin_v;
-  updateSubtitleStylePreview();
-}
-
-function updateSubtitleStylePreview() {
-  const style = currentSubtitleStyleFromControls();
-  videoSubtitleStyle = style;
-  const preview = document.getElementById('subtitle-style-preview-text');
-  const sizeLabel = document.getElementById('subtitle-style-size-label');
-  const outlineLabel = document.getElementById('subtitle-style-outline-label');
-  const marginLabel = document.getElementById('subtitle-style-margin-label');
-  if (sizeLabel) sizeLabel.textContent = `${style.font_size}`;
-  if (outlineLabel) outlineLabel.textContent = `${style.outline}`;
-  if (marginLabel) marginLabel.textContent = `${style.margin_v}`;
-  if (preview) {
-    const visualSize = Math.max(18, Math.min(34, Math.round(style.font_size * 0.52)));
-    preview.style.fontSize = `${visualSize}px`;
-    preview.style.fontWeight = style.bold ? '900' : '700';
-    preview.style.bottom = `${Math.max(18, Math.min(56, Math.round(style.margin_v * 0.42)))}px`;
-    preview.style.textShadow = [
-      `0 0 ${Math.max(2, style.outline)}px #000`,
-      `1px 1px ${Math.max(2, style.outline)}px #000`,
-      `-1px -1px ${Math.max(2, style.outline)}px #000`,
-    ].join(',');
-  }
-}
-
-async function loadSubtitleStyleDefault() {
-  try {
-    const res = await fetchWithTimeout(`${SERVER_URL}/api/video/subtitle-style`, {}, 5000);
-    const data = await res.json();
-    applySubtitleStyleToControls(data.style || DEFAULT_VIDEO_SUBTITLE_STYLE);
-  } catch {
-    applySubtitleStyleToControls(JSON.parse(localStorage.getItem('crataSubtitleStyle') || 'null') || DEFAULT_VIDEO_SUBTITLE_STYLE);
-  }
-}
-
-async function saveSubtitleStyleDefault() {
-  const style = currentSubtitleStyleFromControls();
-  localStorage.setItem('crataSubtitleStyle', JSON.stringify(style));
-  try {
-    const saved = await postToServer('/api/video/subtitle-style', { style }, 10000);
-    if (!saved?.ok) throw new Error(saved?.error || '저장 실패');
-    applySubtitleStyleToControls(saved.style || style);
-    showToast('자막 스타일 기본값을 저장했습니다.', 'success');
-  } catch (error) {
-    showToast(error.message || '자막 스타일 저장에 실패했습니다.', 'warning');
-  }
+  return videoSubtitleStyle;
 }
 
 const VIDEO_PROCESS_STEPS = [
@@ -12789,7 +12691,7 @@ async function startVideoEncoding() {
       preset,
       presetLabel,
       speakerCount,
-      subtitleStyle: currentSubtitleStyleFromControls(),
+      subtitleStyle: currentVideoSubtitleStyle(),
       runnerPreference: 'codex',
     }, 20000);
 
