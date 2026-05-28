@@ -26,6 +26,18 @@ VIDEO_STATUS_FILE = ROOT / 'video_status.json'
 VIDEO_SYSTEM_CACHE = {'at': 0, 'data': {}}
 VIDEO_TEXT_ARTIFACT_EXTENSIONS = {'.srt', '.ass', '.vtt', '.txt', '.md', '.json', '.csv', '.log'}
 VIDEO_ARTIFACT_MAX_BYTES = 700000
+DEFAULT_VIDEO_SUBTITLE_STYLE = {
+    'font_name': 'Malgun Gothic',
+    'font_size': 54,
+    'bold': True,
+    'primary_color': '#FFFFFF',
+    'outline_color': '#000000',
+    'outline': 3,
+    'shadow': 0,
+    'margin_v': 74,
+    'speaker_labels': False,
+    'speaker_colors': False,
+}
 VIDEO_PROCESS_STEPS = [
     {'id': 'raw_transcribe', 'label': '원본 전사', 'desc': 'large-v3로 원본 SRT/전사본 생성'},
     {'id': 'diarize', 'label': '화자분리', 'desc': '입력한 화자 수 기준으로 화자 라벨 부여'},
@@ -101,6 +113,62 @@ def write_json_file(fpath, data):
 def read_local_settings():
     data = read_json_file(LOCAL_SETTINGS_FILE, {})
     return data if isinstance(data, dict) else {}
+
+
+def write_local_settings(settings):
+    data = settings if isinstance(settings, dict) else {}
+    write_json_file(LOCAL_SETTINGS_FILE, data)
+    return data
+
+
+def clamp_number(value, default, minimum, maximum):
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        num = default
+    return max(minimum, min(maximum, num))
+
+
+def normalize_hex_color(value, default='#FFFFFF'):
+    raw = str(value or '').strip()
+    if re.match(r'^#[0-9A-Fa-f]{6}$', raw):
+        return raw.upper()
+    return default
+
+
+def normalize_video_subtitle_style(raw=None):
+    raw = raw if isinstance(raw, dict) else {}
+    style = {**DEFAULT_VIDEO_SUBTITLE_STYLE}
+    style.update({
+        'font_name': str(raw.get('font_name') or raw.get('fontName') or style['font_name']).strip()[:80] or style['font_name'],
+        'font_size': int(clamp_number(raw.get('font_size') or raw.get('fontSize'), style['font_size'], 28, 96)),
+        'bold': bool(raw.get('bold', style['bold'])),
+        'primary_color': normalize_hex_color(raw.get('primary_color') or raw.get('primaryColor'), style['primary_color']),
+        'outline_color': normalize_hex_color(raw.get('outline_color') or raw.get('outlineColor'), style['outline_color']),
+        'outline': round(clamp_number(raw.get('outline'), style['outline'], 0, 8), 1),
+        'shadow': round(clamp_number(raw.get('shadow'), style['shadow'], 0, 6), 1),
+        'margin_v': int(clamp_number(raw.get('margin_v') or raw.get('marginV'), style['margin_v'], 20, 180)),
+        'speaker_labels': False,
+        'speaker_colors': False,
+    })
+    style['primary_color'] = '#FFFFFF'
+    return style
+
+
+def read_video_subtitle_style():
+    settings = read_local_settings()
+    video_settings = settings.get('video') if isinstance(settings.get('video'), dict) else {}
+    return normalize_video_subtitle_style(video_settings.get('subtitle_style'))
+
+
+def save_video_subtitle_style(data):
+    style = normalize_video_subtitle_style(data.get('style') if isinstance(data.get('style'), dict) else data)
+    settings = read_local_settings()
+    video_settings = settings.get('video') if isinstance(settings.get('video'), dict) else {}
+    video_settings['subtitle_style'] = style
+    settings['video'] = video_settings
+    write_local_settings(settings)
+    return {'ok': True, 'style': style}
 
 
 def parse_port(value, default=8765):
@@ -965,6 +1033,7 @@ def video_status_payload():
         'completed_files': [],
         'current_step': 0,
         'current_process': '',
+        'subtitle_style': read_video_subtitle_style(),
         'process_steps': VIDEO_PROCESS_STEPS,
         'process_status': {},
         'system_metrics': collect_system_metrics(),
@@ -2981,6 +3050,7 @@ def create_video_encoding_task(data):
 
     preset = str(data.get('preset') or 'fast').strip()
     preset_label = str(data.get('presetLabel') or preset).strip()
+    subtitle_style = normalize_video_subtitle_style(data.get('subtitleStyle') if isinstance(data.get('subtitleStyle'), dict) else read_video_subtitle_style())
     runner_preference = data.get('runnerPreference') if data.get('runnerPreference') in ('claude', 'codex') else 'codex'
     speaker_count = None
     speaker_count_raw = data.get('speakerCount') if data.get('speakerCount') is not None else data.get('speaker_count')
@@ -3008,6 +3078,7 @@ def create_video_encoding_task(data):
         'source_path': source_path,
         'preset': preset,
         'preset_label': preset_label,
+        'subtitle_style': subtitle_style,
         'steps': step_labels,
         'speaker_count': speaker_count,
         'review_required': True,
@@ -3072,6 +3143,16 @@ def create_video_encoding_task(data):
 출력 품질/용도:
 {preset_label} ({preset})
 
+자막 스타일:
+- 화자 접두어 표시: 사용하지 않음. [강사], [질문자] 같은 표시는 최종 자막에 넣지 마세요.
+- 화자별 색상: 사용하지 않음. 모든 자막은 흰색으로 통일하세요.
+- 글꼴: {subtitle_style.get('font_name')}
+- 크기: {subtitle_style.get('font_size')}
+- 굵게: {'사용' if subtitle_style.get('bold') else '사용 안 함'}
+- 외곽선: {subtitle_style.get('outline')}
+- 그림자: {subtitle_style.get('shadow')}
+- 하단 여백: {subtitle_style.get('margin_v')}
+
 필수 품질검토 순서:
 1. 원본 전사: faster-whisper large-v3로 raw SRT/전사본을 생성하세요. 이 원본은 보존합니다.
 2. 화자분리: 입력된 화자 수({speaker_count_label})를 기준으로 raw 전사 세그먼트에 화자 라벨을 붙이세요.
@@ -3122,6 +3203,7 @@ def create_video_encoding_task(data):
         'videoPreset': preset,
         'videoPresetLabel': preset_label,
         'videoSpeakerCount': speaker_count,
+        'videoSubtitleStyle': subtitle_style,
         'videoReviewRequired': True,
         'videoPreviewRequired': needs_preview,
         'assignments': [
@@ -3599,6 +3681,9 @@ class CrataHandler(BaseHTTPRequestHandler):
             result = read_video_artifact(artifact_path)
             self.send_json_or_jsonp(result, parsed.query, 200 if result.get('ok') else 404)
 
+        elif path == '/api/video/subtitle-style':
+            self.send_json_or_jsonp({'ok': True, 'style': read_video_subtitle_style()}, parsed.query)
+
         elif path in ('/api/video/status', '/video_status.json'):
             self.send_json_or_jsonp(video_status_payload(), parsed.query)
 
@@ -3758,6 +3843,9 @@ class CrataHandler(BaseHTTPRequestHandler):
 
         elif path == '/api/video/encoding/cancel':
             self.send_json(cancel_video_encoding_task(data))
+
+        elif path == '/api/video/subtitle-style':
+            self.send_json(save_video_subtitle_style(data))
 
         elif path == '/api/video/edit':
             self.send_json(save_video_edit_action(data))

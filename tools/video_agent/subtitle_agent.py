@@ -62,11 +62,24 @@ PROCESS_ID_BY_TASK = {
 
 # ── 화자 색상 설정 (ASS 형식: &HAABBGGRR) ────────────────────────────────────
 SPEAKER_STYLES = {
-    "SPEAKER_00": {"name": "강사",   "color_ass": "&H0000FFFF", "color_hex": "#FFFF00"},
-    "SPEAKER_01": {"name": "질문자", "color_ass": "&H00FFFFFF", "color_hex": "#FFFFFF"},
-    "SPEAKER_02": {"name": "화자3",  "color_ass": "&H0000FF80", "color_hex": "#80FF00"},
+    "SPEAKER_00": {"name": "화자1", "color_ass": "&H00FFFFFF", "color_hex": "#FFFFFF"},
+    "SPEAKER_01": {"name": "화자2", "color_ass": "&H00FFFFFF", "color_hex": "#FFFFFF"},
+    "SPEAKER_02": {"name": "화자3", "color_ass": "&H00FFFFFF", "color_hex": "#FFFFFF"},
 }
-DEFAULT_STYLE = {"name": "화자", "color_ass": "&H00CCCCCC", "color_hex": "#CCCCCC"}
+DEFAULT_STYLE = {"name": "화자", "color_ass": "&H00FFFFFF", "color_hex": "#FFFFFF"}
+DEFAULT_SUBTITLE_STYLE = {
+    "font_name": "Malgun Gothic",
+    "font_size": 54,
+    "bold": True,
+    "primary_color": "#FFFFFF",
+    "outline_color": "#000000",
+    "outline": 3,
+    "shadow": 0,
+    "margin_v": 74,
+    "speaker_labels": False,
+    "speaker_colors": False,
+}
+VISIBLE_SPEAKER_PREFIX = re.compile(r"^\s*(?:\[(?:강사|질문자|화자\s*\d+|SPEAKER[_\s-]*\d+)\]|(?:강사|질문자|화자\s*\d+|SPEAKER[_\s-]*\d+)\s*[:：])\s*", re.IGNORECASE)
 
 # ── 사진 오버레이 설정 ─────────────────────────────────────────────────────────
 # preview 명령으로 확인 후 값을 조정하세요
@@ -90,6 +103,84 @@ _status_data: dict = {}
 
 def _now_iso() -> str:
     return datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def _clamp_number(value, default, minimum, maximum):
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        num = default
+    return max(minimum, min(maximum, num))
+
+
+def _normalize_hex(value: str, default: str = "#FFFFFF") -> str:
+    raw = str(value or "").strip()
+    return raw.upper() if re.match(r"^#[0-9A-Fa-f]{6}$", raw) else default
+
+
+def hex_to_ass_color(value: str) -> str:
+    color = _normalize_hex(value)
+    rr = color[1:3]
+    gg = color[3:5]
+    bb = color[5:7]
+    return f"&H00{bb}{gg}{rr}"
+
+
+def load_subtitle_style() -> dict:
+    style = dict(DEFAULT_SUBTITLE_STYLE)
+    settings_path = PROJECT_ROOT / "처리관리" / "local_settings.json"
+    try:
+        settings = json.loads(settings_path.read_text(encoding="utf-8"))
+        video = settings.get("video") if isinstance(settings.get("video"), dict) else {}
+        configured = video.get("subtitle_style") if isinstance(video.get("subtitle_style"), dict) else {}
+    except Exception:
+        configured = {}
+    style.update({
+        "font_name": str(configured.get("font_name") or configured.get("fontName") or style["font_name"]).strip() or style["font_name"],
+        "font_size": int(_clamp_number(configured.get("font_size") or configured.get("fontSize"), style["font_size"], 28, 96)),
+        "bold": bool(configured.get("bold", style["bold"])),
+        "primary_color": _normalize_hex(configured.get("primary_color") or configured.get("primaryColor"), style["primary_color"]),
+        "outline_color": _normalize_hex(configured.get("outline_color") or configured.get("outlineColor"), style["outline_color"]),
+        "outline": _clamp_number(configured.get("outline"), style["outline"], 0, 8),
+        "shadow": _clamp_number(configured.get("shadow"), style["shadow"], 0, 6),
+        "margin_v": int(_clamp_number(configured.get("margin_v") or configured.get("marginV"), style["margin_v"], 20, 180)),
+        "speaker_labels": False,
+        "speaker_colors": False,
+    })
+    return style
+
+
+def clean_visible_subtitle_text(text: str) -> str:
+    lines = []
+    for line in str(text or "").splitlines():
+        cleaned = re.sub(r"</?font[^>]*>", "", line, flags=re.IGNORECASE)
+        lines.append(VISIBLE_SPEAKER_PREFIX.sub("", cleaned).strip())
+    return "\n".join(line for line in lines if line).strip()
+
+
+def prepare_subtitle_for_display(subtitle: Path) -> Path:
+    if subtitle.suffix.lower() != ".srt":
+        return subtitle
+    raw = subtitle.read_text(encoding="utf-8-sig", errors="replace")
+    blocks = []
+    changed = False
+    for block in re.split(r"\n{2,}", raw.strip()):
+        lines = block.splitlines()
+        next_lines = []
+        for line in lines:
+            if re.match(r"^\d+$", line.strip()) or "-->" in line or not line.strip():
+                next_lines.append(line)
+                continue
+            cleaned = clean_visible_subtitle_text(line)
+            if cleaned != line:
+                changed = True
+            next_lines.append(cleaned)
+        blocks.append("\n".join(next_lines))
+    if not changed:
+        return subtitle
+    display_path = subtitle.with_name(subtitle.stem + "_display.srt")
+    display_path.write_text("\n\n".join(blocks) + "\n", encoding="utf-8")
+    return display_path
 
 
 def write_status(patch: dict | None = None):
@@ -642,16 +733,20 @@ def get_speaker_style(speaker_id: str) -> dict:
 
 def create_ass_file(segments: list[dict], output_path: Path,
                     video_width=3840, video_height=2160):
-    used_speakers  = sorted(set(seg["speaker"] for seg in segments))
-    styles_lines   = []
-    for sp in used_speakers:
-        st   = get_speaker_style(sp)
-        bold = -1 if sp == "SPEAKER_00" else 0
-        styles_lines.append(
-            f"Style: {st['name']},Malgun Gothic,44,{st['color_ass']},"
-            f"&H000000FF,&H00000000,&H80000000,{bold},0,0,0,"
-            f"100,100,0,0,1,2,0,2,10,10,60,1"
-        )
+    style = load_subtitle_style()
+    style_name = "CRATA_Subtitle"
+    primary = hex_to_ass_color(style["primary_color"])
+    outline = hex_to_ass_color(style["outline_color"])
+    bold = -1 if style["bold"] else 0
+    font_size = int(style["font_size"])
+    outline_width = style["outline"]
+    shadow = style["shadow"]
+    margin_v = int(style["margin_v"])
+    styles_lines = [
+        f"Style: {style_name},{style['font_name']},{font_size},{primary},"
+        f"&H000000FF,{outline},&H80000000,{bold},0,0,0,"
+        f"100,100,0,0,1,{outline_width},{shadow},2,10,10,{margin_v},1"
+    ]
 
     header = (
         "[Script Info]\nTitle: 화자분리 자막\nScriptType: v4.00+\n"
@@ -669,11 +764,10 @@ def create_ass_file(segments: list[dict], output_path: Path,
 
     lines = [header]
     for seg in segments:
-        st   = get_speaker_style(seg["speaker"])
-        text = seg["text"].replace("\n", "\\N")
+        text = clean_visible_subtitle_text(seg["text"]).replace("\n", "\\N")
         lines.append(
             f"Dialogue: 0,{format_ass_time(seg['start'])},{format_ass_time(seg['end'])},"
-            f"{st['name']},,0,0,0,,{text}"
+            f"{style_name},,0,0,0,,{text}"
         )
     output_path.write_text("\n".join(lines), encoding="utf-8")
 
@@ -681,10 +775,9 @@ def create_ass_file(segments: list[dict], output_path: Path,
 def create_colored_srt(segments: list[dict], output_path: Path):
     lines = []
     for i, seg in enumerate(segments, 1):
-        st   = get_speaker_style(seg["speaker"])
-        colored = f'<font color="{st["color_hex"]}">{seg["text"]}</font>'
+        text = clean_visible_subtitle_text(seg["text"])
         lines.append(
-            f"{i}\n{format_srt_time(seg['start'])} --> {format_srt_time(seg['end'])}\n{colored}\n"
+            f"{i}\n{format_srt_time(seg['start'])} --> {format_srt_time(seg['end'])}\n{text}\n"
         )
     output_path.write_text("\n".join(lines), encoding="utf-8")
 
@@ -802,6 +895,7 @@ def _hardcode_with_photo(video: Path, subtitle: Path, out_path: Path,
                           duration: int | None = None, fast: bool = False):
     total_sec = duration if duration else get_duration(video)
     ff     = get_ffmpeg()
+    subtitle = prepare_subtitle_for_display(subtitle)
     fc     = _build_photo_filter(subtitle)
     crf    = "22" if fast else "18"
     preset = "fast" if fast else "slow"
@@ -922,15 +1016,21 @@ def cmd_final(yes: bool = False):
 def hardcode_subtitles(video: Path, subtitle: Path) -> Path:
     """자막(SRT 또는 ASS)을 영상에 하드코딩 → *_sub.mp4 (사진 오버레이 없음)"""
     out = video.with_name(video.stem + "_sub.mp4")
+    subtitle = prepare_subtitle_for_display(subtitle)
     esc = str(subtitle).replace("\\", "/").replace(":", "\\:")
+    style = load_subtitle_style()
 
     if subtitle.suffix.lower() == ".ass":
         vf = f"ass='{esc}'"
     else:
+        primary = hex_to_ass_color(style["primary_color"])
+        outline = hex_to_ass_color(style["outline_color"])
+        bold = -1 if style["bold"] else 0
         vf = (
             f"subtitles='{esc}':force_style='"
-            "FontName=Malgun Gothic,FontSize=44,"
-            "PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,Outline=2'"
+            f"FontName={style['font_name']},FontSize={int(style['font_size'])},"
+            f"PrimaryColour={primary},OutlineColour={outline},"
+            f"Bold={bold},Outline={style['outline']},Shadow={style['shadow']},MarginV={int(style['margin_v'])}'"
         )
 
     cmd = [
