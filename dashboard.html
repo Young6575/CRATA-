@@ -6111,15 +6111,15 @@ body {
             <button onclick="document.getElementById('video-encoding-upload-input')?.click()" style="padding: 10px 14px; border-radius: var(--radius-md); background: var(--bg-input); border: 1px solid var(--border); color: var(--text-hover); font-size: 13px; font-weight: 700; cursor: pointer; transition: var(--transition); white-space: nowrap;">
               현재 기기에서 선택
             </button>
-            <input type="file" id="video-encoding-upload-input" accept=".mp4,.mov,.mkv,.avi,.webm,.m4v,.mts,.m2ts,video/*" multiple style="display:none;" onchange="uploadCurrentDeviceVideosForEncoding(this.files)">
+            <input type="file" id="video-encoding-upload-input" accept=".mp4,.mov,.mkv,.avi,.webm,.m4v,.mts,.m2ts,.mxf,video/*" multiple style="display:none;" onchange="uploadCurrentDeviceVideosForEncoding(this.files)">
             <button onclick="openVideoBrowser('video-path-input')" style="padding: 10px 14px; border-radius: var(--radius-md); background: var(--bg-input); border: 1px solid var(--border); color: var(--text-hover); font-size: 13px; font-weight: 700; cursor: pointer; transition: var(--transition); white-space: nowrap;">
               데스크탑에서 선택
             </button>
             <button onclick="previewVideoPathFromInput('video-path-input')" style="padding: 10px 14px; border-radius: var(--radius-md); background: var(--bg-input); border: 1px solid var(--border); color: var(--text-hover); font-size: 13px; font-weight: 700; cursor: pointer; transition: var(--transition); white-space: nowrap;">
               미리보기
             </button>
-            <button onclick="startVideoEncoding()" style="padding: 10px 20px; border-radius: var(--radius-md); background: var(--green); border: none; color: var(--bg); font-size: 13.5px; font-weight: 700; cursor: pointer; transition: var(--transition); display: flex; align-items: center; gap: 8px;">
-              인코딩 시작 <span>▶</span>
+            <button id="video-encoding-start-btn" onclick="startVideoEncoding()" style="padding: 10px 20px; border-radius: var(--radius-md); background: var(--green); border: none; color: var(--bg); font-size: 13.5px; font-weight: 700; cursor: pointer; transition: var(--transition); display: flex; align-items: center; gap: 8px;">
+              인코딩 작업 요청 <span>▶</span>
             </button>
           </div>
 
@@ -11422,7 +11422,7 @@ function updateVideoUI(data) {
   const totalCount = data.total_files || 0;
   
   // Update UI Labels
-  currentStatusLbl.textContent = status === 'active' ? '가공 중' : '대기';
+  currentStatusLbl.textContent = status === 'active' ? '가공 중' : (status === 'requested' ? '요청됨' : '대기');
   singlePct.textContent = Math.round(progress);
   singleBar.style.width = `${progress}%`;
   currentFileName.textContent = currentFile ? currentFile : '대기 상태 - 영상 인코딩이 시작되면 파일 정보가 표시됩니다.';
@@ -11435,6 +11435,10 @@ function updateVideoUI(data) {
     navDot.style.backgroundColor = 'var(--green)';
     navDot.style.boxShadow = '0 0 8px var(--green)';
     elapsedLbl.textContent = `파이프라인 실행 중 | 예상 잔여 시간: ${(totalCount - completedCount) * 4}분`;
+  } else if (status === 'requested') {
+    navDot.style.backgroundColor = 'var(--yellow)';
+    navDot.style.boxShadow = '0 0 8px var(--yellow)';
+    elapsedLbl.textContent = 'CLI 에이전트 작업으로 등록되었습니다. 작업 지시서에서 실제 처리 결과를 확인하세요.';
   } else {
     navDot.style.backgroundColor = 'var(--text-muted)';
     navDot.style.boxShadow = 'none';
@@ -11492,94 +11496,69 @@ function updateVideoUI(data) {
   }
 }
 
-// Start Simulated Encoding (for static file environment fallback)
-function startVideoEncoding() {
+function selectedVideoEncodingSteps() {
+  const steps = [
+    ['transcribe', '전사', 'chk-step-transcribe'],
+    ['diarize', '화자분리', 'chk-step-diarize'],
+    ['burnin', '자막 하드코딩', 'chk-step-burnin'],
+    ['encode', '최종 인코딩', 'chk-step-encode'],
+  ];
+  return steps
+    .filter(([, , id]) => document.getElementById(id)?.checked)
+    .map(([id, label]) => ({ id, label }));
+}
+
+// Register a real CLI task. The old fake progress simulation was intentionally removed.
+async function startVideoEncoding() {
   const pathInput = document.getElementById('video-path-input').value.trim();
   if (!pathInput) {
     showToast('비디오 소스 파일 경로를 입력하십시오.', 'warning');
     return;
   }
-  
-  if (isSimulatedEncoding) {
-    showToast('이미 비디오 인코딩 파이프라인이 실행 중입니다.', 'warning');
+
+  const steps = selectedVideoEncodingSteps();
+  if (!steps.length) {
+    showToast('실행할 인코딩 단계를 하나 이상 선택하십시오.', 'warning');
     return;
   }
-  
-  showToast('파이프라인 시작: subtitle_agent.py final CLI를 트리거합니다.', 'info');
-  
-  // Create simulated files array
-  simulatedFiles = [
-    '01_자기효능감_설명_성인.mp4',
-    '02_문제해결_과제형_초등.mp4',
-    '03_행동동기_수확형_유아.mp4',
-    '04_자기효능감_비교형_성인.mp4',
-    '05_행동동기_성장형_청소년.mp4',
-    '06_문제해결_인지형_아동.mp4',
-    '07_조직10유형_가용성_성인.mp4'
-  ];
-  
-  isSimulatedEncoding = true;
-  simulatedCurrentIndex = 0;
-  simulatedProgress = 0;
-  simulatedOverallProgress = 0;
-  simulatedActiveStep = 1;
-  simulatedStepFractions[0] = 0;
-  simulatedStepFractions[1] = 0;
-  simulatedStepFractions[2] = 0;
-  simulatedStepFractions[3] = 0;
-  
-  const completedList = [];
-  
-  simulatedInterval = setInterval(() => {
-    simulatedProgress += 5; // progress velocity
-    
-    // Calculate overall batch progress
-    const baseProgress = (simulatedCurrentIndex / simulatedFiles.length) * 100;
-    simulatedOverallProgress = baseProgress + (simulatedProgress / simulatedFiles.length);
-    
-    // Simulate steps progress
-    if (simulatedOverallProgress < 25) simulatedActiveStep = 1;
-    else if (simulatedOverallProgress < 50) simulatedActiveStep = 2;
-    else if (simulatedOverallProgress < 75) simulatedActiveStep = 3;
-    else simulatedActiveStep = 4;
-    
-    // Tick index completed
-    if (simulatedProgress >= 100) {
-      completedList.push(simulatedFiles[simulatedCurrentIndex]);
-      simulatedCurrentIndex++;
-      simulatedProgress = 0;
-    }
-    
-    if (simulatedCurrentIndex >= simulatedFiles.length) {
-      // Simulation finished
-      clearInterval(simulatedInterval);
-      isSimulatedEncoding = false;
-      showToast('인코딩 완료: 7개의 자막 가공 비디오 파일이 성공적으로 렌더링되었습니다.', 'success');
-      
-      updateVideoUI({
-        status: 'idle',
-        progress: 100,
-        current_file: '',
-        batch_progress: 100,
-        total_files: simulatedFiles.length,
-        completed_files: completedList,
-        current_step: 4
-      });
-      syncCompletedVideosForEdit(completedList, pathInput);
+
+  const presetEl = document.getElementById('video-preset-select');
+  const preset = presetEl?.value || 'fast';
+  const presetLabel = presetEl?.selectedOptions?.[0]?.textContent || preset;
+  const btn = document.getElementById('video-encoding-start-btn');
+  if (btn) btn.disabled = true;
+  showToast('영상 인코딩 작업을 CLI 대기열에 등록합니다.', 'info');
+
+  try {
+    const saved = await postToServer('/api/video/encoding/start', {
+      sourcePath: pathInput,
+      steps,
+      preset,
+      presetLabel,
+      runnerPreference: 'codex',
+    }, 20000);
+
+    if (!saved?.ok) {
+      showToast(saved?.error || '영상 인코딩 작업 등록에 실패했습니다.', 'warning');
       return;
     }
-    
-    updateVideoUI({
-      status: 'active',
-      progress: simulatedProgress,
-      current_file: simulatedFiles[simulatedCurrentIndex],
-      batch_progress: simulatedOverallProgress,
-      total_files: simulatedFiles.length,
-      completed_files: completedList,
-      current_step: simulatedActiveStep
+
+    updateVideoUI(saved.videoStatus || {
+      status: 'requested',
+      progress: 0,
+      current_file: pathInput,
+      batch_progress: 0,
+      total_files: 1,
+      completed_files: [],
+      current_step: 0,
     });
-    
-  }, 1000);
+    showToast('영상 인코딩 작업을 등록했습니다. 작업 지시서에서 진행 상황을 확인하세요.', 'success');
+    setTimeout(fetchRealData, 1000);
+  } catch (error) {
+    showToast(error.message || '영상 인코딩 작업 등록 중 오류가 발생했습니다.', 'warning');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 // --- Interactive Video Editor Controls ---
@@ -11688,17 +11667,13 @@ function executeCliRequest() {
     updateVideoEditQueueItem(selectedVideoEditItemId, 'editing');
   }
   
-  // Automatically trigger simulation encoding to show life in the page!
-  if (!isSimulatedEncoding) {
-    setTimeout(() => {
-      // Sync path to auto-encoding path input
-      const autoPathEl = document.getElementById('video-path-input');
-      if (autoPathEl && pathEl) {
-        autoPathEl.value = pathEl.value;
-      }
-      startVideoEncoding();
-    }, 1000);
-  }
+  setTimeout(() => {
+    const autoPathEl = document.getElementById('video-path-input');
+    if (autoPathEl && pathEl) {
+      autoPathEl.value = pathEl.value;
+    }
+    startVideoEncoding();
+  }, 1000);
 }
 </script>
 </body>

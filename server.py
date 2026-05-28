@@ -397,6 +397,41 @@ def resolve_video_preview_path(raw_path=''):
     return target, ''
 
 
+def collect_video_source_files(raw_path='', max_files=5000):
+    raw_path = str(raw_path or '').strip()
+    if not raw_path:
+        return [], '영상 경로가 비어 있습니다.'
+    try:
+        target = pathlib.Path(raw_path).expanduser().resolve()
+    except Exception as exc:
+        return [], f'경로를 해석할 수 없습니다: {exc}'
+    if not target.exists():
+        return [], '해당 영상 경로가 존재하지 않습니다.'
+    if target.is_file():
+        if target.suffix.lower() not in VIDEO_EXTENSIONS:
+            return [], '지원하지 않는 영상 파일 형식입니다.'
+        return [target], ''
+    if not target.is_dir():
+        return [], '영상 파일 또는 폴더 경로를 입력하세요.'
+
+    files = []
+    try:
+        for child in target.rglob('*'):
+            if len(files) >= max_files:
+                break
+            if any(part.startswith('$') or part.startswith('.') for part in child.parts):
+                continue
+            if child.is_file() and child.suffix.lower() in VIDEO_EXTENSIONS:
+                files.append(child)
+    except Exception as exc:
+        return [], f'폴더 안의 영상 파일을 읽을 수 없습니다: {exc}'
+
+    files.sort(key=lambda p: str(p).lower())
+    if not files:
+        return [], '이 폴더에는 처리 가능한 영상 파일이 없습니다.'
+    return files, ''
+
+
 def video_upload_dir():
     settings = read_local_settings()
     video_settings = settings.get('video') if isinstance(settings.get('video'), dict) else {}
@@ -2212,6 +2247,100 @@ def create_meeting_process_task(data):
     return {'ok': True, 'task': task, 'meetings': read_meetings_state()}
 
 
+def create_video_encoding_task(data):
+    source_path = str(data.get('sourcePath') or data.get('path') or '').strip()
+    files, error = collect_video_source_files(source_path)
+    if error:
+        return {'ok': False, 'error': error}
+
+    steps = data.get('steps') if isinstance(data.get('steps'), list) else []
+    step_labels = []
+    for step in steps:
+        if isinstance(step, dict):
+            label = str(step.get('label') or step.get('id') or '').strip()
+        else:
+            label = str(step or '').strip()
+        if label:
+            step_labels.append(label)
+    if not step_labels:
+        return {'ok': False, 'error': '실행할 인코딩 단계를 하나 이상 선택하세요.'}
+
+    preset = str(data.get('preset') or 'fast').strip()
+    preset_label = str(data.get('presetLabel') or preset).strip()
+    runner_preference = data.get('runnerPreference') if data.get('runnerPreference') in ('claude', 'codex') else 'codex'
+    file_preview = [str(path) for path in files[:20]]
+    omitted_count = max(len(files) - len(file_preview), 0)
+
+    status = {
+        'status': 'requested',
+        'progress': 0,
+        'current_file': str(files[0]) if len(files) == 1 else source_path,
+        'batch_progress': 0,
+        'total_files': len(files),
+        'completed_files': [],
+        'current_step': 0,
+        'requested_at': now_iso(),
+        'source_path': source_path,
+        'preset': preset,
+        'preset_label': preset_label,
+        'steps': step_labels,
+    }
+    write_json_file(VIDEO_STATUS_FILE, status)
+
+    desc = f"""데스크탑 영상 인코딩 작업입니다.
+
+중요:
+- 이 작업은 시뮬레이션이 아닙니다. 실제 처리 가능한 로컬 파이프라인을 찾아 실행하세요.
+- 우선 repo 안과 데스크탑 작업 환경에서 subtitle_agent.py, ffmpeg, whisper/전사, diarization, subtitle burn-in, final encode 관련 스크립트를 확인하세요.
+- 실행 가능한 파이프라인이 없으면 임의 완료 처리하지 말고 필요한 스크립트/의존성/명령을 결과에 명확히 보고하세요.
+- 진행 중에는 video_status.json을 갱신하세요. 형식은 status(active|requested|done|error), progress, current_file, batch_progress, total_files, completed_files, current_step, message 입니다.
+- MXF는 웹 미리보기가 안 될 수 있지만 ffmpeg 입력으로는 처리 가능할 수 있습니다.
+
+소스 경로:
+{source_path}
+
+대상 파일 수: {len(files)}
+대상 파일 미리보기:
+{chr(10).join('- ' + path for path in file_preview)}
+{f'- ... 외 {omitted_count}개' if omitted_count else ''}
+
+선택 단계:
+{', '.join(step_labels)}
+
+출력 품질/용도:
+{preset_label} ({preset})
+
+처리 지침:
+1. 소스 경로가 데스크탑 서버 기준 실제 경로인지 다시 확인하세요.
+2. 선택된 단계만 수행하세요.
+3. 결과 파일 경로와 실패한 파일이 있으면 실패 원인을 남기세요.
+4. 완료 후 편집이 필요한 결과물은 처리관리/video_edit_queue.json에 pending_edit 항목으로 추가하세요.
+"""
+
+    task, _ = save_task_request({
+        'title': f'영상 인코딩: {pathlib.Path(source_path).name or source_path}',
+        'desc': desc,
+        'type': 'video_encoding',
+        'priority': 'normal',
+        'priorityLbl': '보통',
+        'agent': 'media',
+        'agentName': '영상담당',
+        'runnerPreference': runner_preference,
+        'categoryId': 'media-work',
+        'categoryName': '영상/미디어',
+        'categoryColor': 'red',
+        'videoSourcePath': source_path,
+        'videoFileCount': len(files),
+        'videoSteps': step_labels,
+        'videoPreset': preset,
+        'videoPresetLabel': preset_label,
+        'assignments': [
+            {'name': '영상담당', 'role': '영상 인코딩 파이프라인 실행', 'progress': 0, 'status': 'pending'},
+        ],
+    }, start=True)
+    return {'ok': True, 'task': task, 'videoStatus': status}
+
+
 # ── 데이터 파싱 헬퍼 ────────────────────────────────────────────────
 
 def parse_frontmatter(content):
@@ -2575,6 +2704,8 @@ def handle_action(action, data):
         return create_meeting_sync_task(data)
     if action == 'meetings/process':
         return create_meeting_process_task(data)
+    if action == 'video/encoding/start':
+        return create_video_encoding_task(data)
     if action == 'calendar':
         return save_calendar_event(data)
     if action == 'calendar/parse':
@@ -2823,6 +2954,9 @@ class CrataHandler(BaseHTTPRequestHandler):
                     result['restart_scheduled'] = False
                     result['restart_error'] = str(exc)
             self.send_json(result)
+
+        elif path == '/api/video/encoding/start':
+            self.send_json(create_video_encoding_task(data))
 
         elif path == '/api/video/edit':
             self.send_json(save_video_edit_action(data))
