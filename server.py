@@ -1102,6 +1102,20 @@ def video_status_payload():
             pct = 0
         status['status'] = 'done' if pct >= 100 else 'active'
     status['current_process'] = infer_current_video_process(status)
+    if status.get('status') == 'waiting_preview_review':
+        status['current_process'] = 'subtitle_preview_review'
+        status['current_process_label'] = '미리보기 확인 대기'
+        if status.get('preview_file'):
+            process_status = status.get('process_status') if isinstance(status.get('process_status'), dict) else {}
+            current_info = process_status.get('subtitle_preview_review') if isinstance(process_status.get('subtitle_preview_review'), dict) else {}
+            process_status['subtitle_preview_review'] = {
+                **current_info,
+                'status': 'waiting',
+                'progress': 100,
+                'message': current_info.get('message') or '미리보기 파일 생성 완료. 확인 후 승인 대기 중입니다.',
+            }
+            status['process_status'] = process_status
+            status['message'] = status.get('message') or '미리보기 파일 생성 완료. 확인 후 승인하면 최종 인코딩을 진행합니다.'
     enrich_video_process_results(status)
     status['system_metrics'] = collect_system_metrics()
     return status

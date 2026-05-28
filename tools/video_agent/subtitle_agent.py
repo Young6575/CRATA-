@@ -56,6 +56,7 @@ PROCESS_ID_BY_TASK = {
     "transcribe": "raw_transcribe",
     "diarize": "diarize",
     "review": "transcript_quality_review",
+    "preview": "subtitle_preview_review",
     "hardcode": "burnin",
     "final": "final_encode",
 }
@@ -955,12 +956,60 @@ def cmd_preview():
     print(f"  출력:  {out_path}")
     print("  (35초 fast 인코딩...)", flush=True)
 
+    init_status("preview", 1)
+    write_status({
+        "done": 0,
+        "current_file": f"{video.parent.name}/{video.name}",
+        "current_process": "subtitle_preview_review",
+        "current_process_label": "미리보기 생성 중",
+        "progress": 5,
+        "progress_pct": 5,
+        "completed": [],
+        "completed_files": [],
+    })
+    update_process_progress("subtitle_preview_review", 15, "자막 미리보기 클립 생성 중")
+
     try:
         _hardcode_with_photo(video, subtitle, out_path, duration=35, fast=True)
+        add_process_result("subtitle_preview_review", {
+            "title": "자막 미리보기",
+            "path": str(out_path),
+            "kind": "미리보기",
+            "viewer": "video",
+        })
+        process_status = _status_data.get("process_status") if isinstance(_status_data.get("process_status"), dict) else {}
+        process_status["subtitle_preview_review"] = {
+            "status": "waiting",
+            "progress": 100,
+            "message": "미리보기 파일 생성 완료. 확인 후 승인 대기 중입니다.",
+        }
+        write_status({
+            "status": "waiting_preview_review",
+            "current_process": "subtitle_preview_review",
+            "current_process_label": "미리보기 확인 대기",
+            "progress": 100,
+            "progress_pct": 100,
+            "preview_file": str(out_path),
+            "message": "미리보기 파일 생성 완료. 확인 후 승인하면 최종 인코딩을 진행합니다.",
+            "process_status": process_status,
+        })
         print(f"\n완료: {out_path}")
         print("\nPHOTO_WIDTH / PHOTO_X / PHOTO_Y 조정 후 preview 재실행")
         print("만족하면: python subtitle_agent.py final")
     except Exception as e:
+        process_status = _status_data.get("process_status") if isinstance(_status_data.get("process_status"), dict) else {}
+        process_status["subtitle_preview_review"] = {
+            "status": "error",
+            "progress": int(_status_data.get("progress") or 0),
+            "message": str(e),
+        }
+        write_status({
+            "status": "error",
+            "current_process": "subtitle_preview_review",
+            "current_process_label": "미리보기 오류",
+            "message": str(e),
+            "process_status": process_status,
+        })
         print(f"[오류] {e}")
 
 
