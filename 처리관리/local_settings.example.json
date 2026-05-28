@@ -10,6 +10,7 @@
   },
   "video": {
     "workspace_dir": "D:/CRATA_Video_Work",
+    "upload_dir": "D:/CRATA_Video_Work/uploads",
     "source_dirs": [
       "D:/CRATA_Video_Work/source"
     ],

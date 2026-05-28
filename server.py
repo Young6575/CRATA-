@@ -4,7 +4,7 @@
 브라우저: http://localhost:8765
 """
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
-import json, re, glob, pathlib, mimetypes, os, shutil, socket, subprocess, tempfile, threading, time
+import json, re, glob, pathlib, mimetypes, os, shutil, socket, subprocess, tempfile, threading, time, uuid
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qs
 
@@ -20,6 +20,8 @@ TRANSCRIPTS_DIR = ROOT / '처리관리' / '녹음' / 'transcripts'
 CALENDAR_FILE = ROOT / '처리관리' / 'calendar_events.json'
 LOCAL_SETTINGS_FILE = ROOT / '처리관리' / 'local_settings.json'
 VIDEO_EXTENSIONS = {'.mp4', '.mov', '.mkv', '.avi', '.webm', '.m4v', '.mts', '.m2ts'}
+VIDEO_EDIT_QUEUE_FILE = ROOT / '처리관리' / 'video_edit_queue.json'
+VIDEO_STATUS_FILE = ROOT / 'video_status.json'
 
 DEFAULT_CATEGORIES = [
     {'id': 'phrase-edit', 'name': '문구수정', 'color': 'blue', 'keywords': ['문구', '결과지', '카피', '표현', '윤문', 'revise', 'phrase']},
@@ -244,6 +246,343 @@ def browse_video_files(raw_path=''):
         'selected': selected_file,
         'items': items,
         'extensions': sorted(VIDEO_EXTENSIONS),
+    }
+
+
+def video_upload_dir():
+    settings = read_local_settings()
+    video_settings = settings.get('video') if isinstance(settings.get('video'), dict) else {}
+    configured = video_settings.get('upload_dir') or video_settings.get('workspace_dir')
+    if configured:
+        try:
+            path = pathlib.Path(str(configured)).expanduser()
+            path.mkdir(parents=True, exist_ok=True)
+            return path.resolve()
+        except Exception:
+            pass
+    path = ROOT / '처리관리' / 'video_uploads'
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def safe_upload_filename(filename):
+    name = pathlib.Path(str(filename or 'upload.mp4')).name
+    name = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', '_', name).strip(' ._')
+    return name or f'upload_{int(time.time())}.mp4'
+
+
+def unique_upload_path(filename):
+    upload_dir = video_upload_dir()
+    safe_name = safe_upload_filename(filename)
+    stem = pathlib.Path(safe_name).stem or 'upload'
+    suffix = pathlib.Path(safe_name).suffix.lower()
+    if suffix not in VIDEO_EXTENSIONS:
+        suffix = '.mp4'
+    candidate = upload_dir / f'{stem}{suffix}'
+    if not candidate.exists():
+        return candidate
+    stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    return upload_dir / f'{stem}_{stamp}{suffix}'
+
+
+def normalize_video_source_key(path_value):
+    return str(path_value or '').replace('\\', '/').strip().lower()
+
+
+def video_item_title(source_path, title=''):
+    if title:
+        return str(title).strip()
+    name = pathlib.Path(str(source_path or '')).name
+    return name or '영상 편집 작업'
+
+
+def make_video_edit_item(source_path, title='', source='manual', status='pending_edit', note=''):
+    return {
+        'id': f'vedit_{int(time.time() * 1000)}_{uuid.uuid4().hex[:6]}',
+        'title': video_item_title(source_path, title),
+        'source_path': str(source_path or '').strip(),
+        'status': status,
+        'source': source,
+        'note': str(note or '').strip(),
+        'created_at': now_iso(),
+        'updated_at': now_iso(),
+        'cut_start': '',
+        'cut_end': '',
+        'layout': 'pip',
+    }
+
+
+def read_video_status():
+    data = read_json_file(VIDEO_STATUS_FILE, {})
+    return data if isinstance(data, dict) else {}
+
+
+def load_video_edit_queue_raw():
+    data = read_json_file(VIDEO_EDIT_QUEUE_FILE, {'items': []})
+    items = data.get('items') if isinstance(data.get('items'), list) else []
+    return data if isinstance(data, dict) else {'items': items}
+
+
+def write_video_edit_queue(items):
+    state = {
+        'updated_at': now_iso(),
+        'items': items,
+    }
+    write_json_file(VIDEO_EDIT_QUEUE_FILE, state)
+    return state
+
+
+def merge_video_edit_items(items):
+    merged = {}
+    order = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        source_path = str(item.get('source_path') or item.get('path') or '').strip()
+        if not source_path:
+            continue
+        key = normalize_video_source_key(source_path)
+        existing = merged.get(key)
+        normalized = {
+            'id': item.get('id') or f'vedit_{int(time.time() * 1000)}_{uuid.uuid4().hex[:6]}',
+            'title': video_item_title(source_path, item.get('title') or ''),
+            'source_path': source_path,
+            'status': item.get('status') or 'pending_edit',
+            'source': item.get('source') or 'manual',
+            'note': item.get('note') or '',
+            'created_at': item.get('created_at') or now_iso(),
+            'updated_at': item.get('updated_at') or now_iso(),
+            'cut_start': item.get('cut_start') or '',
+            'cut_end': item.get('cut_end') or '',
+            'layout': item.get('layout') or 'pip',
+        }
+        if existing:
+            current_stamp = task_sort_stamp(existing)
+            next_stamp = task_sort_stamp(normalized)
+            merged[key] = {**existing, **normalized} if next_stamp >= current_stamp else {**normalized, **existing}
+        else:
+            merged[key] = normalized
+            order.append(key)
+    return [merged[key] for key in order if key in merged]
+
+
+def subtitle_completed_items_from_status():
+    status = read_video_status()
+    completed = status.get('completed_files') if isinstance(status.get('completed_files'), list) else []
+    items = []
+    for file_value in completed:
+        if isinstance(file_value, dict):
+            source_path = file_value.get('path') or file_value.get('file') or file_value.get('name') or ''
+            title = file_value.get('title') or pathlib.Path(str(source_path)).name
+        else:
+            source_path = str(file_value or '')
+            title = pathlib.Path(source_path).name or source_path
+        if not source_path:
+            continue
+        items.append(make_video_edit_item(source_path, title=title, source='subtitle', status='pending_edit'))
+    return items
+
+
+def video_edit_sort_key(item):
+    status_order = {
+        'pending_edit': 0,
+        'queued': 0,
+        'editing': 1,
+        'in_progress': 1,
+        'done': 2,
+        'completed': 2,
+    }
+    try:
+        stamp = datetime.fromisoformat(str(task_sort_stamp(item))).timestamp()
+    except Exception:
+        stamp = 0
+    return (status_order.get(item.get('status'), 1), -stamp)
+
+
+def read_video_edit_queue():
+    raw = load_video_edit_queue_raw()
+    stored = raw.get('items') if isinstance(raw.get('items'), list) else []
+    items = merge_video_edit_items(stored + subtitle_completed_items_from_status())
+    items.sort(key=video_edit_sort_key)
+    if items != stored:
+        write_video_edit_queue(items)
+    pending = len([item for item in items if item.get('status') in ('pending_edit', 'queued')])
+    editing = len([item for item in items if item.get('status') in ('editing', 'in_progress')])
+    done = len([item for item in items if item.get('status') in ('done', 'completed')])
+    return {
+        'ok': True,
+        'updated_at': now_iso(),
+        'items': items,
+        'kpis': {
+            'total': len(items),
+            'pending': pending,
+            'editing': editing,
+            'done': done,
+        },
+    }
+
+
+def save_video_edit_action(data):
+    action = str(data.get('action') or 'add')
+    state = read_video_edit_queue()
+    items = state.get('items', [])
+
+    if action in ('add', 'bulk_add'):
+        additions = []
+        if action == 'bulk_add':
+            values = data.get('items') if isinstance(data.get('items'), list) else []
+            for value in values:
+                if isinstance(value, dict):
+                    source_path = value.get('source_path') or value.get('path') or ''
+                    title = value.get('title') or ''
+                else:
+                    source_path = str(value or '')
+                    title = ''
+                if source_path:
+                    additions.append(make_video_edit_item(source_path, title=title, source=data.get('source') or 'subtitle'))
+        else:
+            source_path = str(data.get('source_path') or data.get('path') or '').strip()
+            if not source_path:
+                return {'ok': False, 'error': '영상 경로가 비어 있습니다.'}
+            additions.append(make_video_edit_item(
+                source_path,
+                title=data.get('title') or '',
+                source=data.get('source') or 'manual',
+                note=data.get('note') or '',
+            ))
+        items = merge_video_edit_items(additions + items)
+
+    elif action == 'update':
+        item_id = str(data.get('id') or '')
+        changed = False
+        for item in items:
+            if str(item.get('id')) != item_id:
+                continue
+            for key in ('title', 'status', 'note', 'cut_start', 'cut_end', 'layout', 'source_path'):
+                if key in data:
+                    item[key] = data.get(key)
+            item['updated_at'] = now_iso()
+            changed = True
+            break
+        if not changed:
+            return {'ok': False, 'error': '대기열 항목을 찾지 못했습니다.'}
+
+    elif action == 'delete':
+        item_id = str(data.get('id') or '')
+        items = [item for item in items if str(item.get('id')) != item_id]
+
+    else:
+        return {'ok': False, 'error': '지원하지 않는 영상 편집 작업입니다.'}
+
+    items = merge_video_edit_items(items)
+    items.sort(key=video_edit_sort_key)
+    write_video_edit_queue(items)
+    return read_video_edit_queue()
+
+
+def parse_content_disposition(value):
+    result = {}
+    for part in str(value or '').split(';'):
+        if '=' not in part:
+            result[part.strip().lower()] = True
+            continue
+        key, raw = part.split('=', 1)
+        result[key.strip().lower()] = raw.strip().strip('"')
+    return result
+
+
+def drain_multipart_part(handler, boundary):
+    while True:
+        line = handler.rfile.readline()
+        if not line:
+            return True
+        if line.startswith(boundary):
+            return line.rstrip().endswith(b'--')
+
+
+def handle_video_upload(handler):
+    content_type = handler.headers.get('Content-Type', '')
+    match = re.search(r'boundary=(?:"([^"]+)"|([^;]+))', content_type)
+    if not match:
+        return {'ok': False, 'error': 'multipart 업로드가 아닙니다.'}
+    boundary = ('--' + (match.group(1) or match.group(2))).encode('utf-8')
+    uploaded = []
+
+    # Move to first boundary.
+    while True:
+        line = handler.rfile.readline()
+        if not line:
+            return {'ok': False, 'error': '업로드 본문을 읽지 못했습니다.'}
+        if line.startswith(boundary):
+            if line.rstrip().endswith(b'--'):
+                return {'ok': False, 'error': '업로드된 파일이 없습니다.'}
+            break
+
+    done = False
+    while not done:
+        headers = {}
+        while True:
+            line = handler.rfile.readline()
+            if not line:
+                done = True
+                break
+            if line in (b'\r\n', b'\n'):
+                break
+            key, _, value = line.decode('utf-8', errors='ignore').partition(':')
+            headers[key.strip().lower()] = value.strip()
+        if done:
+            break
+
+        disposition = parse_content_disposition(headers.get('content-disposition', ''))
+        filename = disposition.get('filename') or ''
+        suffix = pathlib.Path(filename).suffix.lower()
+        if not filename or suffix not in VIDEO_EXTENSIONS:
+            done = drain_multipart_part(handler, boundary)
+            continue
+
+        dest = unique_upload_path(filename)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        bytes_written = 0
+        previous = None
+        with dest.open('wb') as f:
+            while True:
+                line = handler.rfile.readline()
+                if not line:
+                    done = True
+                    break
+                if line.startswith(boundary):
+                    if previous is not None:
+                        if previous.endswith(b'\r\n'):
+                            previous = previous[:-2]
+                        elif previous.endswith(b'\n'):
+                            previous = previous[:-1]
+                        f.write(previous)
+                        bytes_written += len(previous)
+                    done = line.rstrip().endswith(b'--')
+                    break
+                if previous is not None:
+                    f.write(previous)
+                    bytes_written += len(previous)
+                previous = line
+
+        uploaded.append({
+            'name': dest.name,
+            'path': str(dest),
+            'size': bytes_written,
+        })
+
+    if not uploaded:
+        return {'ok': False, 'error': '지원하는 영상 파일이 없습니다.'}
+
+    queue = save_video_edit_action({
+        'action': 'bulk_add',
+        'source': 'upload',
+        'items': [{'source_path': item['path'], 'title': item['name']} for item in uploaded],
+    })
+    return {
+        'ok': True,
+        'uploaded': uploaded,
+        'queue': queue,
     }
 
 
@@ -2135,6 +2474,9 @@ class CrataHandler(BaseHTTPRequestHandler):
             browse_path = (query.get('path') or [''])[0]
             self.send_json_or_jsonp(browse_video_files(browse_path), parsed.query)
 
+        elif path == '/api/video/edit':
+            self.send_json_or_jsonp(read_video_edit_queue(), parsed.query)
+
         elif path.startswith('/api/action/'):
             payload = (parse_qs(parsed.query).get('payload') or ['{}'])[0]
             try:
@@ -2177,6 +2519,11 @@ class CrataHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+
+        if path == '/api/video/upload':
+            self.send_json(handle_video_upload(self))
+            return
+
         length = int(self.headers.get('Content-Length', 0))
         body   = self.rfile.read(length) if length else b'{}'
 
@@ -2207,6 +2554,9 @@ class CrataHandler(BaseHTTPRequestHandler):
 
         elif path == '/api/calendar/delete':
             self.send_json(delete_calendar_event(data))
+
+        elif path == '/api/video/edit':
+            self.send_json(save_video_edit_action(data))
 
         elif path == '/api/phrase':
             fpath = inbox_dir / f'phrase_{ts}.json'

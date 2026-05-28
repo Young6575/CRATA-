@@ -33,6 +33,8 @@ _dev.log
 *.flac
 처리관리/video/
 처리관리/videos/
+처리관리/video_uploads/
+처리관리/video_edit_queue.json
 처리관리/render/
 처리관리/renders/
 영상작업/

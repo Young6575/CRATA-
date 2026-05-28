@@ -6287,6 +6287,28 @@ body {
         <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">자막 수정, 영상 컷 시점, 오버레이 사진 배치를 정의하여 CLI로 인코딩 요청을 보냅니다.</p>
       </div>
 
+      <div class="card" style="margin-bottom:16px; padding:16px 18px;">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:12px;">
+          <div>
+            <div class="card-title" style="margin-bottom:4px;">편집 대기열</div>
+            <div style="font-size:12px; color:var(--text-muted); line-height:1.5;">자막 처리까지 끝났지만 편집 완료 표시가 없는 영상이 먼저 표시됩니다. 항목을 누르면 아래 편집 설정에 바로 불러옵니다.</div>
+          </div>
+          <div id="video-edit-queue-kpis" style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;"></div>
+        </div>
+        <div style="display:grid; grid-template-columns:minmax(0,1fr) auto auto auto; gap:8px; align-items:center; margin-bottom:10px;">
+          <div style="position:relative; display:flex; align-items:center;">
+            <span style="position:absolute; left:10px; font-family:var(--font-mono); color:var(--text-muted); font-size:12px;">$</span>
+            <input type="text" id="video-edit-add-path" placeholder="대기열에 추가할 데스크탑 영상/폴더 경로" style="width:100%; padding:8px 10px 8px 24px; border-radius:var(--radius-sm); background:var(--bg-input); border:1px solid var(--border); color:var(--text-white); font-size:12px; font-family:var(--font-mono); outline:none;">
+          </div>
+          <button onclick="openVideoBrowser('video-edit-add-path')" style="padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-input);color:var(--text-hover);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">데스크탑 선택</button>
+          <button onclick="addVideoEditQueueItem()" style="padding:8px 10px;border-radius:var(--radius-sm);border:1px solid rgba(var(--accent-rgb),0.35);background:rgba(var(--accent-rgb),0.12);color:var(--text-white);font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;">대기열 추가</button>
+          <button onclick="document.getElementById('video-upload-input')?.click()" style="padding:8px 10px;border-radius:var(--radius-sm);border:1px solid rgba(16,185,129,0.28);background:rgba(16,185,129,0.11);color:#bbf7d0;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;">노트북 파일 업로드</button>
+          <input type="file" id="video-upload-input" accept=".mp4,.mov,.mkv,.avi,.webm,.m4v,.mts,.m2ts,video/*" multiple style="display:none;" onchange="uploadNotebookVideos(this.files)">
+        </div>
+        <div id="video-upload-hint" style="font-size:11.5px; color:var(--text-muted); margin-bottom:10px;">노트북 파일 업로드는 현재 브라우저에서 선택한 파일을 데스크탑 서버의 업로드 폴더로 복사한 뒤 편집 대기열에 추가합니다.</div>
+        <div id="video-edit-queue-list" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:8px;"></div>
+      </div>
+
       <div class="g2" style="margin-bottom: 24px; grid-template-columns: 1.2fr 1fr; gap: 20px;">
         <div class="card" style="display: flex; flex-direction: column; gap: 18px; padding: 20px;">
           <!-- 대상 영상 경로 -->
@@ -8809,6 +8831,7 @@ function nav(id, el) {
   }
   if (id === 'video-edit') {
     showToast('영상 작업 및 편집 설정이 로드되었습니다.', 'info');
+    loadVideoEditQueue();
   }
   if (id === 'coverage') {
     updateCovKPIs();
@@ -10856,9 +10879,202 @@ function triggerExportReview() {
 
 
 // --- 7. VIDEO PAGE - POLLING AND SIMULATION ---
+let videoEditQueueData = [];
+let selectedVideoEditItemId = '';
 let videoBrowserTargetInputId = 'video-path-input';
 let videoBrowserCurrentPath = '';
 let videoBrowserParentPath = '';
+
+function videoEditStatusLabel(status) {
+  const labels = {
+    pending_edit: '편집 대기',
+    queued: '편집 대기',
+    editing: '편집 중',
+    in_progress: '편집 중',
+    done: '편집 완료',
+    completed: '편집 완료',
+  };
+  return labels[status] || '확인 필요';
+}
+
+function videoEditSourceLabel(source) {
+  const labels = {
+    subtitle: '자막 완료',
+    upload: '노트북 업로드',
+    manual: '직접 추가',
+  };
+  return labels[source] || source || '직접 추가';
+}
+
+function videoEditStatusColor(status) {
+  if (status === 'done' || status === 'completed') return 'rgba(16,185,129,0.16)';
+  if (status === 'editing' || status === 'in_progress') return 'rgba(59,130,246,0.16)';
+  return 'rgba(245,158,11,0.15)';
+}
+
+async function loadVideoEditQueue() {
+  const list = document.getElementById('video-edit-queue-list');
+  if (list) list.innerHTML = '<div style="grid-column:1/-1;padding:18px;text-align:center;color:var(--text-muted);font-size:12px;">편집 대기열을 불러오는 중입니다.</div>';
+  try {
+    const res = await fetchWithTimeout(`${SERVER_URL}/api/video/edit`, {}, 10000);
+    const data = await res.json();
+    videoEditQueueData = Array.isArray(data.items) ? data.items : [];
+    renderVideoEditQueue(data.kpis || {});
+  } catch (error) {
+    if (list) list.innerHTML = '<div style="grid-column:1/-1;padding:18px;text-align:center;color:var(--text-muted);font-size:12px;">서버 대기열을 불러오지 못했습니다.</div>';
+  }
+}
+
+function renderVideoEditQueue(kpis = {}) {
+  const list = document.getElementById('video-edit-queue-list');
+  const kpiEl = document.getElementById('video-edit-queue-kpis');
+  if (kpiEl) {
+    const chips = [
+      ['대기', kpis.pending ?? videoEditQueueData.filter(item => ['pending_edit', 'queued'].includes(item.status)).length],
+      ['편집 중', kpis.editing ?? videoEditQueueData.filter(item => ['editing', 'in_progress'].includes(item.status)).length],
+      ['완료', kpis.done ?? videoEditQueueData.filter(item => ['done', 'completed'].includes(item.status)).length],
+    ];
+    kpiEl.innerHTML = chips.map(([label, value]) => `
+      <span style="padding:5px 8px;border:1px solid var(--border);background:var(--bg-input);border-radius:var(--radius-sm);font-size:11.5px;color:var(--text);">${label} <b style="color:var(--text-white);">${value}</b></span>
+    `).join('');
+  }
+  if (!list) return;
+  if (!videoEditQueueData.length) {
+    list.innerHTML = '<div style="grid-column:1/-1;padding:18px;text-align:center;color:var(--text-muted);font-size:12.5px;">아직 편집 대기 영상이 없습니다. 데스크탑 경로를 추가하거나 노트북 파일을 업로드하세요.</div>';
+    return;
+  }
+  list.innerHTML = videoEditQueueData.map(item => {
+    const active = item.id === selectedVideoEditItemId;
+    const status = videoEditStatusLabel(item.status);
+    const source = videoEditSourceLabel(item.source);
+    return `
+      <article onclick="selectVideoEditQueueItem('${escapeHtml(escapeJs(item.id))}')" style="border:1px solid ${active ? 'rgba(var(--accent-rgb),0.55)' : 'var(--border)'}; background:${active ? 'rgba(var(--accent-rgb),0.10)' : 'rgba(255,255,255,0.018)'}; border-radius:var(--radius-md); padding:10px 12px; cursor:pointer; min-width:0;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:7px;">
+          <span style="font-size:12px; font-weight:800; color:var(--text-white); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(item.title || '영상 편집 작업')}</span>
+          <span style="font-size:10.5px; padding:3px 6px; border-radius:999px; background:${videoEditStatusColor(item.status)}; color:var(--text-hover); white-space:nowrap;">${escapeHtml(status)}</span>
+        </div>
+        <div style="font-family:var(--font-mono); color:var(--text-muted); font-size:11px; line-height:1.45; word-break:break-all; min-height:32px;">${escapeHtml(item.source_path || '')}</div>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:9px;">
+          <span style="font-size:11px; color:var(--text-muted);">${escapeHtml(source)}</span>
+          <div style="display:flex; gap:5px;">
+            <button onclick="event.stopPropagation(); selectVideoEditQueueItem('${escapeHtml(escapeJs(item.id))}')" style="padding:4px 7px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-input);color:var(--text-hover);font-size:11px;cursor:pointer;">불러오기</button>
+            <button onclick="event.stopPropagation(); updateVideoEditQueueItem('${escapeHtml(escapeJs(item.id))}', 'done')" style="padding:4px 7px;border-radius:var(--radius-sm);border:1px solid rgba(16,185,129,0.28);background:rgba(16,185,129,0.10);color:#bbf7d0;font-size:11px;cursor:pointer;">완료</button>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join('');
+}
+
+function selectVideoEditQueueItem(id) {
+  const item = videoEditQueueData.find(entry => String(entry.id) === String(id));
+  if (!item) return;
+  selectedVideoEditItemId = item.id;
+  const pathInput = document.getElementById('video-edit-path-input');
+  if (pathInput) {
+    pathInput.value = item.source_path || '';
+    pathInput.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  if (item.cut_start && document.getElementById('video-cut-start')) document.getElementById('video-cut-start').value = item.cut_start;
+  if (item.cut_end && document.getElementById('video-cut-end')) document.getElementById('video-cut-end').value = item.cut_end;
+  if (item.layout) selectLayoutPreset(item.layout);
+  renderVideoEditQueue();
+  updateCliCommand();
+}
+
+async function addVideoEditQueueItem() {
+  const input = document.getElementById('video-edit-add-path');
+  const sourcePath = input?.value.trim() || '';
+  if (!sourcePath) {
+    showToast('추가할 영상 또는 폴더 경로를 입력하세요.', 'warning');
+    return;
+  }
+  const saved = await postToServer('/api/video/edit', {
+    action: 'add',
+    source: 'manual',
+    source_path: sourcePath,
+  }, 20000);
+  if (saved && saved.ok) {
+    if (input) input.value = '';
+    videoEditQueueData = saved.items || [];
+    renderVideoEditQueue(saved.kpis || {});
+    showToast('편집 대기열에 추가했습니다.', 'success');
+  } else {
+    showToast(saved?.error || '편집 대기열 추가에 실패했습니다.', 'warning');
+  }
+}
+
+async function updateVideoEditQueueItem(id, status) {
+  const item = videoEditQueueData.find(entry => String(entry.id) === String(id));
+  const payload = {
+    action: 'update',
+    id,
+    status,
+  };
+  if (item && String(item.id) === String(selectedVideoEditItemId)) {
+    payload.cut_start = document.getElementById('video-cut-start')?.value.trim() || item.cut_start || '';
+    payload.cut_end = document.getElementById('video-cut-end')?.value.trim() || item.cut_end || '';
+    payload.layout = selectedLayout || item.layout || 'pip';
+  }
+  const saved = await postToServer('/api/video/edit', payload, 20000);
+  if (saved && saved.ok) {
+    videoEditQueueData = saved.items || [];
+    renderVideoEditQueue(saved.kpis || {});
+    showToast(status === 'done' ? '편집 완료로 표시했습니다.' : '편집 상태를 갱신했습니다.', 'success');
+  } else {
+    showToast(saved?.error || '상태 변경에 실패했습니다.', 'warning');
+  }
+}
+
+async function uploadNotebookVideos(fileList) {
+  const files = Array.from(fileList || []);
+  const input = document.getElementById('video-upload-input');
+  if (!files.length) return;
+  const form = new FormData();
+  files.forEach(file => form.append('files', file, file.name));
+  showToast(`${files.length}개 파일을 데스크탑 서버로 업로드합니다.`, 'info');
+  try {
+    const res = await fetchWithTimeout(`${SERVER_URL}/api/video/upload`, {
+      method: 'POST',
+      body: form,
+    }, 1000 * 60 * 30);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || '업로드 실패');
+    videoEditQueueData = data.queue?.items || videoEditQueueData;
+    renderVideoEditQueue(data.queue?.kpis || {});
+    showToast(`업로드 완료: ${data.uploaded?.length || files.length}개 파일을 대기열에 추가했습니다.`, 'success');
+  } catch (error) {
+    showToast(error.message || '노트북 파일 업로드에 실패했습니다.', 'warning');
+  } finally {
+    if (input) input.value = '';
+  }
+}
+
+function joinVideoPath(basePath, fileName) {
+  const base = String(basePath || '').trim();
+  const file = String(fileName || '').trim();
+  if (!base) return file;
+  if (/\.[A-Za-z0-9]{2,5}$/.test(base)) return base;
+  const sep = base.includes('\\') && !base.includes('/') ? '\\' : '/';
+  return `${base.replace(/[\\/]+$/, '')}${sep}${file}`;
+}
+
+async function syncCompletedVideosForEdit(completedFiles, basePath) {
+  const items = (completedFiles || []).filter(Boolean).map(file => ({
+    source_path: joinVideoPath(basePath, file),
+    title: String(file).split(/[\\/]/).pop(),
+  }));
+  if (!items.length) return;
+  const saved = await postToServer('/api/video/edit', {
+    action: 'bulk_add',
+    source: 'subtitle',
+    items,
+  }, 20000);
+  if (saved && saved.ok) {
+    videoEditQueueData = saved.items || videoEditQueueData;
+    renderVideoEditQueue(saved.kpis || {});
+  }
+}
 
 function videoFileSizeLabel(bytes) {
   const size = Number(bytes || 0);
@@ -11139,6 +11355,7 @@ function startVideoEncoding() {
         completed_files: completedList,
         current_step: 4
       });
+      syncCompletedVideosForEdit(completedList, pathInput);
       return;
     }
     
@@ -11257,6 +11474,9 @@ function executeCliRequest() {
   const cmdEl = document.getElementById('generated-cli-cmd');
   const cmdText = cmdEl ? cmdEl.textContent : '';
   showToast('CLI 요청을 백엔드 스케줄러에 전송했습니다!', 'success');
+  if (selectedVideoEditItemId) {
+    updateVideoEditQueueItem(selectedVideoEditItemId, 'editing');
+  }
   
   // Automatically trigger simulation encoding to show life in the page!
   if (!isSimulatedEncoding) {
