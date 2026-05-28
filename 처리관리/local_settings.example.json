@@ -1,0 +1,15 @@
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8765
+  },
+  "desktop_server_example": {
+    "host": "0.0.0.0",
+    "port": 8765,
+    "note": "데스크탑 실행 서버에서 Tailscale 접속을 받을 때 server.host를 0.0.0.0으로 바꿉니다."
+  },
+  "video": {
+    "workspace_dir": "D:/CRATA_Video_Work",
+    "render_output_dir": "D:/CRATA_Video_Work/renders"
+  }
+}

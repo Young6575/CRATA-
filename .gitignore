@@ -1,0 +1,43 @@
+__pycache__/
+*.py[cod]
+*_dev.log
+_dev.log
+
+# Local-only agent/runtime settings
+처리관리/local_settings.json
+.claude/settings.local.json
+.codex/settings.local.json
+.codex/settings.local.toml
+.env
+.env.*
+
+# Runtime task state owned by the desktop execution server
+처리관리/inbox/task_*.json
+처리관리/inbox/review_*.json
+처리관리/inbox/phrase_*.json
+처리관리/녹음/plaud_meetings.json
+처리관리/녹음/plaud_processed.json
+처리관리/녹음/transcripts/
+처리관리/calendar_events.json
+
+# Large media files and render outputs
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.webm
+*.m4a
+*.wav
+*.mp3
+*.aac
+*.flac
+처리관리/video/
+처리관리/videos/
+처리관리/render/
+처리관리/renders/
+영상작업/
+렌더링/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db

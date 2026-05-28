@@ -1,0 +1,115 @@
+{
+  "updated_at": "2026-05-28T04:01:06.080855",
+  "categories": [
+    {
+      "id": "phrase-edit",
+      "name": "문구수정",
+      "color": "blue",
+      "keywords": [
+        "문구",
+        "결과지",
+        "카피",
+        "표현",
+        "윤문",
+        "revise",
+        "phrase"
+      ]
+    },
+    {
+      "id": "knowledge-edit",
+      "name": "지식수정",
+      "color": "green",
+      "keywords": [
+        "지식",
+        "정의",
+        "유형",
+        "조합",
+        "검사개요",
+        "knowledge"
+      ]
+    },
+    {
+      "id": "homepage-design",
+      "name": "홈페이지 디자인 수정",
+      "color": "purple",
+      "keywords": [
+        "홈페이지",
+        "대시보드",
+        "관제",
+        "디자인",
+        "화면",
+        "ui",
+        "ux",
+        "프론트",
+        "dashboard"
+      ]
+    },
+    {
+      "id": "meeting-minutes",
+      "name": "회의록 처리",
+      "color": "yellow",
+      "keywords": [
+        "회의록",
+        "plaud",
+        "녹음",
+        "전사",
+        "transcript",
+        "회의"
+      ]
+    },
+    {
+      "id": "review-docs",
+      "name": "검수/문서화",
+      "color": "blue",
+      "keywords": [
+        "검수",
+        "docx",
+        "문서",
+        "대표님",
+        "리뷰",
+        "export",
+        "apply"
+      ]
+    },
+    {
+      "id": "media-work",
+      "name": "영상/미디어",
+      "color": "red",
+      "keywords": [
+        "영상",
+        "자막",
+        "인코딩",
+        "미디어",
+        "video"
+      ]
+    },
+    {
+      "id": "system-tools",
+      "name": "시스템/도구",
+      "color": "green",
+      "keywords": [
+        "서버",
+        "api",
+        "codex",
+        "claude",
+        "브리지",
+        "자동화",
+        "도구",
+        "cli"
+      ]
+    },
+    {
+      "id": "ops-planning",
+      "name": "운영/기획",
+      "color": "yellow",
+      "keywords": [
+        "기획",
+        "운영",
+        "보고",
+        "일정",
+        "계획",
+        "프로그램"
+      ]
+    }
+  ]
+}

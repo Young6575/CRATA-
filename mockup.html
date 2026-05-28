@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRATA 에이전트 대시보드</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0f0f11;color:#e0e0e0;font-family:'Segoe UI',system-ui,sans-serif;display:flex;height:100vh;overflow:hidden}
+.sidebar{width:200px;background:#141416;border-right:1px solid #242428;display:flex;flex-direction:column;flex-shrink:0}
+.sidebar-logo{padding:18px 16px 16px;border-bottom:1px solid #242428}
+.sidebar-logo h1{font-size:15px;font-weight:800;color:#fff;letter-spacing:.06em}
+.sidebar-logo p{font-size:11px;color:#555;margin-top:3px}
+.nav-section{padding:12px 8px 0}
+.nav-label{font-size:10px;color:#444;letter-spacing:.08em;text-transform:uppercase;padding:0 8px;margin-bottom:4px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:13px;color:#666;transition:all .15s;margin-bottom:1px}
+.nav-item:hover{background:#1e1e22;color:#bbb}
+.nav-item.active{background:#182218;color:#4ade80}
+.nav-item .ic{font-size:13px;width:16px;text-align:center}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:50px;background:#141416;border-bottom:1px solid #242428;display:flex;align-items:center;padding:0 20px;gap:8px;flex-shrink:0}
+.topbar-title{font-size:14px;font-weight:600;color:#fff}
+.kpis{display:flex;gap:6px;margin-left:auto}
+.kpi{display:flex;align-items:center;gap:6px;padding:5px 12px;background:#1a1a1e;border:1px solid #242428;border-radius:7px;font-size:12px}
+.kpi .v{font-weight:700;font-size:14px;color:#fff}
+.kpi .l{color:#555;font-size:11px}
+.dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.dg{background:#4ade80;box-shadow:0 0 6px #4ade8088}
+.dy{background:#facc15}
+.dr{background:#f87171}
+.ds{background:#555}
+.content{flex:1;overflow-y:auto;padding:18px}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:#2a2a2e;border-radius:2px}
+.page{display:none}
+.page.active{display:block}
+.card{background:#141416;border:1px solid #242428;border-radius:12px;padding:16px}
+.card-title{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#444;margin-bottom:12px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.g2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.col{display:flex;flex-direction:column;gap:12px}
+
+/* HOME */
+.stat-big{font-size:34px;font-weight:800;color:#fff;line-height:1}
+.stat-sub{font-size:11px;color:#444;margin-top:4px}
+.stat-up{font-size:12px;color:#4ade80}
+.constellation{display:flex;justify-content:center;align-items:center;height:180px}
+.act-item{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #1c1c20;font-size:12px}
+.act-item:last-child{border-bottom:none}
+.act-time{color:#444;white-space:nowrap;font-size:11px;min-width:56px}
+.act-tag{padding:2px 7px;background:#1e1e22;border-radius:4px;color:#888;font-size:10px;white-space:nowrap}
+.act-txt{color:#999;line-height:1.4}
+
+/* BRIEF */
+.brief-date{font-size:22px;font-weight:700;color:#fff;margin-bottom:4px}
+.brief-day{font-size:13px;color:#444;margin-bottom:20px}
+.pri-card{border-left:2px solid;padding:10px 14px;background:#161618;border-radius:0 8px 8px 0;margin-bottom:8px}
+.pri-card.hi{border-color:#f87171}
+.pri-card.md{border-color:#facc15}
+.pri-card.lo{border-color:#4ade80}
+.pri-tag{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#444;margin-bottom:3px}
+.pri-title{font-size:13px;color:#ddd;font-weight:500}
+.pri-meta{font-size:11px;color:#444;margin-top:4px}
+.agent-tag{display:inline-block;padding:1px 7px;border-radius:4px;font-size:11px;background:#1a2218;color:#4ade80;margin-right:4px}
+.agent-tag.y{background:#221e10;color:#facc15}
+.agent-tag.b{background:#111b2a;color:#60a5fa}
+
+/* AGENTS */
+.agents-page{display:flex;gap:16px;height:calc(100vh - 130px)}
+.agents-tree{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
+.a-node{display:flex;align-items:center;gap:12px;padding:12px 20px;background:#161618;border:1px solid #242428;border-radius:40px;min-width:200px;cursor:pointer;transition:all .2s;position:relative}
+.a-node:hover{border-color:#333}
+.a-node.on{border-color:#4ade80;box-shadow:0 0 0 1px #4ade8040,0 0 20px #4ade8015}
+.a-node.sel{border-color:#60a5fa;box-shadow:0 0 0 1px #60a5fa30}
+.a-icon{width:32px;height:32px;background:#1e1e22;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px}
+.a-name{font-size:14px;font-weight:600;color:#fff}
+.a-sub{font-size:11px;color:#555}
+.a-badge{position:absolute;top:-9px;right:14px;background:#4ade80;color:#000;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;letter-spacing:.03em}
+.conn-v{width:2px;background:#242428}
+.conn-row{display:flex;align-items:flex-start;gap:0;position:relative}
+.conn-col{display:flex;flex-direction:column;align-items:center}
+.h-bar{height:2px;background:#242428;align-self:flex-start;margin-top:22px}
+.info-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #1c1c20;font-size:12px}
+.info-row:last-child{border-bottom:none}
+.info-lbl{color:#444;width:60px}
+.info-val{color:#ccc}
+
+/* TASKS */
+.tasks-layout{display:grid;grid-template-columns:280px 1fr;gap:14px;height:calc(100vh - 130px)}
+.task-list{overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+.t-item{padding:10px 12px;border-radius:8px;cursor:pointer;border:1px solid transparent;transition:all .15s}
+.t-item:hover{background:#161618;border-color:#242428}
+.t-item.sel{background:#182218;border-color:#4ade8050}
+.t-name{font-size:13px;color:#ddd;font-weight:500;margin-bottom:4px}
+.t-meta{font-size:11px;color:#444}
+.t-row{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.sbadge{font-size:10px;padding:2px 7px;border-radius:4px;font-weight:600;letter-spacing:.04em}
+.s-active{background:#182218;color:#4ade80}
+.s-pending{background:#1e1c10;color:#facc15}
+.s-idle{background:#1a1a1e;color:#555}
+.s-done{background:#111b2a;color:#60a5fa}
+.task-detail{display:flex;flex-direction:column;gap:14px;overflow-y:auto}
+.detail-header{background:#141416;border:1px solid #242428;border-radius:12px;padding:16px}
+.detail-title{font-size:16px;font-weight:700;color:#fff;margin-bottom:6px}
+.detail-meta{font-size:12px;color:#555}
+.assignment-chart{background:#141416;border:1px solid #242428;border-radius:12px;padding:20px;display:flex;flex-direction:column;align-items:center;gap:0;flex:1}
+.top-task-node{background:#1e1e22;border:1px solid #333;border-radius:12px;padding:14px 28px;text-align:center;min-width:220px}
+.top-task-node .nt{font-size:10px;color:#444;text-transform:uppercase;letter-spacing:.06em}
+.top-task-node .nn{font-size:15px;font-weight:600;color:#fff;margin-top:2px}
+.assign-agents{display:flex;gap:28px;position:relative;padding-top:0}
+.assign-col{display:flex;flex-direction:column;align-items:center;gap:0}
+.assign-card{display:flex;align-items:center;gap:10px;padding:10px 18px;background:#161618;border:1px solid #242428;border-radius:30px;min-width:160px;position:relative;transition:all .2s}
+.assign-card.on{border-color:#4ade80;box-shadow:0 0 0 1px #4ade8040,0 0 16px #4ade8015}
+.assign-card.pend{border-color:#facc1540}
+.assign-role{font-size:10px;color:#444;text-align:center;margin-top:6px}
+.assign-status{position:absolute;top:-8px;right:10px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px}
+.as-active{background:#4ade80;color:#000}
+.as-pending{background:#facc15;color:#000}
+.as-idle{background:#333;color:#666}
+
+/* ── ANIMATIONS ── */
+@keyframes glow-pulse-green {
+  0%,100%{box-shadow:0 0 0 1px #4ade8050,0 0 18px #4ade8018}
+  50%{box-shadow:0 0 0 2px #4ade8090,0 0 32px #4ade8040}
+}
+@keyframes glow-pulse-yellow {
+  0%,100%{box-shadow:0 0 0 1px #facc1540,0 0 12px #facc1510}
+  50%{box-shadow:0 0 0 1px #facc1580,0 0 20px #facc1530}
+}
+@keyframes travel-v {
+  0%{top:-6px;opacity:0}
+  12%{opacity:1}
+  88%{opacity:1}
+  100%{top:calc(100% + 6px);opacity:0}
+}
+@keyframes travel-h-r {
+  0%{left:-6px;opacity:0}
+  12%{opacity:1}
+  88%{opacity:1}
+  100%{left:calc(100% + 6px);opacity:0}
+}
+@keyframes travel-h-l {
+  0%{right:-6px;opacity:0}
+  12%{opacity:1}
+  88%{opacity:1}
+  100%{right:calc(100% + 6px);opacity:0}
+}
+.assign-card.on{animation:glow-pulse-green 2s ease-in-out infinite}
+.assign-card.pend{animation:glow-pulse-yellow 2.5s ease-in-out infinite}
+.conn-travel-v{position:relative;overflow:visible}
+.conn-travel-v::after{
+  content:'';position:absolute;width:7px;height:7px;
+  background:#4ade80;border-radius:50%;
+  left:50%;transform:translateX(-50%);
+  box-shadow:0 0 8px #4ade80,0 0 18px #4ade8070;
+  animation:travel-v 1.8s ease-in-out infinite;
+}
+.conn-travel-v.pend::after{
+  background:#facc15;
+  box-shadow:0 0 8px #facc15,0 0 18px #facc1570;
+  animation:travel-v 2.4s ease-in-out infinite;
+}
+.conn-bar-active{position:relative;overflow:visible}
+.conn-bar-active::after{
+  content:'';position:absolute;width:7px;height:7px;
+  background:#4ade80;border-radius:50%;
+  top:50%;transform:translateY(-50%);
+  box-shadow:0 0 8px #4ade80,0 0 18px #4ade8070;
+  animation:travel-h-r 1.8s ease-in-out infinite;
+}
+/* root->active vertical glow line */
+.conn-root-active{background:linear-gradient(to bottom,#2a2a2e,#4ade8060)!important}
+
+/* COVERAGE */
+.cov-wrap{overflow-x:auto}
+.cov-table{border-collapse:collapse;width:100%;min-width:600px}
+.cov-table th{font-size:11px;color:#444;text-transform:uppercase;letter-spacing:.06em;padding:6px 10px;text-align:center;font-weight:500;border-bottom:1px solid #1e1e22}
+.cov-table td{padding:3px 4px}
+.type-lbl{font-size:12px;color:#999;padding:6px 10px;white-space:nowrap;font-weight:500}
+.way-lbl{font-size:10px;color:#333;padding:4px 8px;white-space:nowrap}
+.c-cell{border-radius:6px;padding:7px 6px;text-align:center;font-size:11px;cursor:pointer;transition:opacity .15s;min-width:80px}
+.c-cell:hover{opacity:.75}
+.c-done{background:#162a16;color:#4ade80;border:1px solid #2a4a2a}
+.c-draft{background:#26220a;color:#facc15;border:1px solid #3a3010}
+.c-empty{background:#161618;color:#2a2a2e;border:1px solid #1e1e22}
+
+/* LOG */
+.tl-item{display:flex;gap:14px;padding:12px 0;border-bottom:1px solid #1a1a1e}
+.tl-item:last-child{border-bottom:none}
+.tl-dot-col{display:flex;flex-direction:column;align-items:center;padding-top:4px}
+.tl-dot{width:8px;height:8px;border-radius:50%;background:#4ade80;flex-shrink:0}
+.tl-line{width:1px;flex:1;background:#1e1e22;margin-top:6px}
+.tl-content{flex:1}
+.tl-head{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.tl-agent{font-size:11px;padding:1px 7px;background:#1e1e22;border-radius:4px;color:#888}
+.tl-time{font-size:11px;color:#333}
+.tl-title{font-size:13px;color:#ddd;font-weight:500;margin-bottom:4px}
+.tl-reason{font-size:12px;color:#555;line-height:1.5}
+
+/* AGENT MANAGE PANEL */
+.manage-panel{width:340px;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+.panel-section{background:#141416;border:1px solid #242428;border-radius:12px;padding:14px}
+.panel-sec-title{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#444;margin-bottom:10px}
+.edit-label{font-size:11px;color:#555;margin-bottom:4px}
+.edit-field{width:100%;background:#0f0f11;border:1px solid #2a2a2e;border-radius:7px;color:#ddd;font-size:12px;padding:8px 10px;resize:none;font-family:inherit;line-height:1.5;transition:border-color .15s}
+.edit-field:focus{outline:none;border-color:#4ade8060}
+.file-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #1a1a1e;font-size:12px}
+.file-row:last-child{border-bottom:none}
+.file-path{flex:1;color:#888;font-family:monospace;font-size:11px}
+.file-badge{font-size:10px;padding:2px 7px;border-radius:4px}
+.fb-rw{background:#1a2e1a;color:#4ade80}
+.fb-ro{background:#1a1a2e;color:#60a5fa}
+.file-row .del-btn{color:#333;cursor:pointer;font-size:14px;transition:color .15s;margin-left:4px}
+.file-row .del-btn:hover{color:#f87171}
+.add-btn{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:6px;background:#1a1a1e;border:1px dashed #2a2a2e;color:#444;font-size:11px;cursor:pointer;transition:all .15s;margin-top:8px;width:100%}
+.add-btn:hover{border-color:#4ade8050;color:#4ade80}
+.skill-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #1a1a1e}
+.skill-row:last-child{border-bottom:none}
+.skill-name{flex:1;font-size:12px;color:#ccc}
+.skill-desc{font-size:11px;color:#444}
+.toggle{width:32px;height:18px;background:#1e1e22;border-radius:9px;position:relative;cursor:pointer;transition:background .2s;border:1px solid #2a2a2e;flex-shrink:0}
+.toggle.on{background:#166534;border-color:#4ade8060}
+.toggle::after{content:'';position:absolute;width:12px;height:12px;background:#333;border-radius:50%;top:2px;left:2px;transition:all .2s}
+.toggle.on::after{background:#4ade80;left:16px;box-shadow:0 0 6px #4ade8080}
+.hist-item{display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid #1a1a1e;font-size:12px}
+.hist-item:last-child{border-bottom:none}
+.hist-time{color:#333;font-size:11px;min-width:52px}
+.hist-txt{color:#888;line-height:1.4}
+.save-btn{width:100%;padding:8px;background:#166534;border:none;border-radius:8px;color:#4ade80;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s;margin-top:2px}
+.save-btn:hover{background:#14532d}
+
+/* REVIEW */
+.rev-item{display:flex;align-items:center;gap:14px;padding:12px;background:#141416;border:1px solid #242428;border-radius:10px;margin-bottom:8px;cursor:pointer;transition:all .15s}
+.rev-item:hover{border-color:#333}
+.rev-num{font-size:22px;font-weight:800;color:#fff;min-width:36px;text-align:center}
+.rev-info{flex:1}
+.rev-title{font-size:13px;color:#ddd;font-weight:500;margin-bottom:3px}
+.rev-meta{font-size:11px;color:#444}
+.rev-stage{display:flex;align-items:center;gap:4px}
+.stage-dot{width:28px;height:4px;border-radius:2px}
+.stage-dot.done{background:#4ade80}
+.stage-dot.active{background:#facc15}
+.stage-dot.wait{background:#242428}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <h1>CRATA</h1>
+    <p>에이전트 대시보드</p>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">메인</div>
+    <div class="nav-item active" onclick="nav('home',this)"><span class="ic">⬡</span> 홈</div>
+    <div class="nav-item" onclick="nav('brief',this)"><span class="ic">☀</span> 오늘의 브리핑</div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">운영</div>
+    <div class="nav-item" onclick="nav('agents',this)"><span class="ic">◈</span> 에이전트</div>
+    <div class="nav-item" onclick="nav('tasks',this)"><span class="ic">◎</span> 작업</div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">자산</div>
+    <div class="nav-item" onclick="nav('coverage',this)"><span class="ic">▦</span> 문구 커버리지</div>
+    <div class="nav-item" onclick="nav('log',this)"><span class="ic">≡</span> 수정 로그</div>
+    <div class="nav-item" onclick="nav('review',this)"><span class="ic">◷</span> 검수 현황</div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">영상</div>
+    <div class="nav-item" onclick="nav('video',this)"><span class="ic">▶</span> 영상 편집 <span id="nav-video-dot" style="margin-left:auto;width:6px;height:6px;border-radius:50%;background:#555;flex-shrink:0"></span></div>
+  </div>
+</aside>
+
+<div class="main">
+  <header class="topbar">
+    <span class="topbar-title" id="page-title">홈</span>
+    <div class="kpis">
+      <div class="kpi"><span class="dot dg"></span><span class="v">10</span><span class="l">유형</span></div>
+      <div class="kpi"><span class="dot dy"></span><span class="v">34%</span><span class="l">문구 완성</span></div>
+      <div class="kpi"><span class="dot dr"></span><span class="v">3</span><span class="l">진행 중 작업</span></div>
+      <div class="kpi"><span class="dot ds"></span><span class="v">오늘</span><span class="l">최근 수정</span></div>
+    </div>
+  </header>
+
+  <div class="content">
+
+    <!-- ── HOME ── -->
+    <div class="page active" id="page-home">
+      <div class="g3" style="margin-bottom:12px">
+        <div class="card">
+          <div class="card-title">지식 항목</div>
+          <div class="stat-big">42</div>
+          <div class="stat-sub">조직검사 유형·조합·원리</div>
+          <div class="stat-up" style="margin-top:8px">↑ 8 이번 주</div>
+        </div>
+        <div class="card">
+          <div class="card-title">문구 커버리지</div>
+          <div class="stat-big">34<span style="font-size:18px;color:#555">%</span></div>
+          <div class="stat-sub">조직검사 기준 27/80셀</div>
+          <div style="margin-top:10px;height:4px;background:#1e1e22;border-radius:2px"><div style="width:34%;height:100%;background:#4ade80;border-radius:2px"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">decisions 누적</div>
+          <div class="stat-big">8</div>
+          <div class="stat-sub">근거 기록</div>
+          <div class="stat-up" style="margin-top:8px">↑ 6 이번 주</div>
+        </div>
+      </div>
+      <!-- 영상 편집 미니 상태 -->
+      <div class="card" id="home-video-card" style="margin-bottom:12px;display:none">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div class="card-title" style="margin-bottom:0">영상 편집 진행</div>
+          <span id="home-video-task" style="font-size:11px;padding:2px 8px;background:#1e1e22;border-radius:4px;color:#888;margin-left:4px"></span>
+          <span style="margin-left:auto;font-size:11px;color:#555" id="home-video-updated"></span>
+        </div>
+        <div style="margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:#555;margin-bottom:4px">
+            <span id="home-video-file" style="color:#9aa0a6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%"></span>
+            <span id="home-video-pct" style="color:#fff;font-weight:700"></span>
+          </div>
+          <div style="background:#1e1e22;border-radius:3px;height:5px;overflow:hidden">
+            <div id="home-video-bar" style="height:100%;background:linear-gradient(90deg,#4285f4,#74b0ff);border-radius:3px;transition:width .5s ease;width:0%"></div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:#555">
+          <span>파일 <span id="home-video-files" style="color:#ddd"></span></span>
+          <span onclick="nav('video',document.querySelector('.nav-item[onclick*=video]'))" style="color:#4285f4;cursor:pointer">자세히 →</span>
+        </div>
+      </div>
+
+      <div class="g2">
+        <div class="card">
+          <div class="card-title">시스템 자산 구성</div>
+          <div class="constellation">
+            <svg width="320" height="160" viewBox="0 0 320 160">
+              <line x1="160" y1="80" x2="80" y2="40" stroke="#2a2a2e" stroke-width="1.5"/>
+              <line x1="160" y1="80" x2="260" y2="35" stroke="#2a2a2e" stroke-width="1.5"/>
+              <line x1="160" y1="80" x2="60" y2="130" stroke="#2a2a2e" stroke-width="1.5"/>
+              <line x1="160" y1="80" x2="270" y2="125" stroke="#2a2a2e" stroke-width="1.5"/>
+              <line x1="80" y1="40" x2="60" y2="130" stroke="#1e1e22" stroke-width="1"/>
+              <line x1="260" y1="35" x2="270" y2="125" stroke="#1e1e22" stroke-width="1"/>
+              <circle cx="160" cy="80" r="28" fill="#1a2e1a" stroke="#4ade80" stroke-width="1.5"/>
+              <text x="160" y="76" text-anchor="middle" fill="#4ade80" font-size="10" font-family="Segoe UI">지식</text>
+              <text x="160" y="89" text-anchor="middle" fill="#4ade80" font-size="13" font-weight="700" font-family="Segoe UI">42</text>
+              <circle cx="80" cy="40" r="20" fill="#1a1a2e" stroke="#60a5fa" stroke-width="1.5"/>
+              <text x="80" y="36" text-anchor="middle" fill="#60a5fa" font-size="9" font-family="Segoe UI">문구</text>
+              <text x="80" y="49" text-anchor="middle" fill="#60a5fa" font-size="12" font-weight="700" font-family="Segoe UI">27</text>
+              <circle cx="260" cy="35" r="16" fill="#22200a" stroke="#facc15" stroke-width="1.5"/>
+              <text x="260" y="31" text-anchor="middle" fill="#facc15" font-size="9" font-family="Segoe UI">규칙</text>
+              <text x="260" y="44" text-anchor="middle" fill="#facc15" font-size="12" font-weight="700" font-family="Segoe UI">5</text>
+              <circle cx="60" cy="130" r="14" fill="#1e1618" stroke="#f87171" stroke-width="1.5"/>
+              <text x="60" y="127" text-anchor="middle" fill="#f87171" font-size="9" font-family="Segoe UI">작업</text>
+              <text x="60" y="139" text-anchor="middle" fill="#f87171" font-size="12" font-weight="700" font-family="Segoe UI">3</text>
+              <circle cx="270" cy="125" r="14" fill="#161e16" stroke="#86efac" stroke-width="1"/>
+              <text x="270" y="122" text-anchor="middle" fill="#86efac" font-size="8" font-family="Segoe UI">decisions</text>
+              <text x="270" y="134" text-anchor="middle" fill="#86efac" font-size="12" font-weight="700" font-family="Segoe UI">8</text>
+            </svg>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">최근 활동</div>
+          <div class="act-item"><span class="act-time">1시간 전</span><span class="act-tag">지식담당</span><span class="act-txt">비교형 조합 설명 초안 작성 완료</span></div>
+          <div class="act-item"><span class="act-time">3시간 전</span><span class="act-tag">지식담당</span><span class="act-txt">16행동유형 정의 재작성 · decisions 기록</span></div>
+          <div class="act-item"><span class="act-time">어제</span><span class="act-tag">지식담당</span><span class="act-txt">행동방식 4축 파일 신설</span></div>
+          <div class="act-item"><span class="act-time">어제</span><span class="act-tag">지식담당</span><span class="act-txt">조직 10유형 초안 일괄 작성</span></div>
+          <div class="act-item"><span class="act-time">2일 전</span><span class="act-tag">지식담당</span><span class="act-txt">성장역량 인지 정의 수정</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── BRIEF ── -->
+    <div class="page" id="page-brief">
+      <div class="brief-date">2026년 5월 23일 토요일</div>
+      <div class="brief-day">오늘의 브리핑 · CRATA 에이전트 현황</div>
+      <div class="g2">
+        <div class="col">
+          <div class="card">
+            <div class="card-title">🔴 오늘 꼭 해야 할 것</div>
+            <div class="pri-card hi">
+              <div class="pri-tag">긴급</div>
+              <div class="pri-title">조직검사 조합 설명 — 비어있는 조합 채우기</div>
+              <div class="pri-meta"><span class="agent-tag">지식담당</span> decisions 기록 필요 · 23개 미완성</div>
+            </div>
+            <div class="pri-card hi">
+              <div class="pri-tag">긴급</div>
+              <div class="pri-title">결과지 문구 — 중심역량 과제형·관계형 작성</div>
+              <div class="pri-meta"><span class="agent-tag y">문구담당</span> 지식 확정 후 진행 가능</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">🟡 이어가야 할 것</div>
+            <div class="pri-card md">
+              <div class="pri-tag">진행 중</div>
+              <div class="pri-title">16행동유형 조합 설명 보강</div>
+              <div class="pri-meta"><span class="agent-tag">지식담당</span> 초안 작성 완료 · 검토 단계</div>
+            </div>
+            <div class="pri-card md">
+              <div class="pri-tag">진행 중</div>
+              <div class="pri-title">대표님 검수용 docx 준비</div>
+              <div class="pri-meta"><span class="agent-tag b">기획담당</span> 지식 확정 이후 export</div>
+            </div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card">
+            <div class="card-title">📊 어제 한 일</div>
+            <div class="act-item"><span class="act-tag">지식담당</span><span class="act-txt" style="margin-left:8px">16행동유형 정의 재작성 — 행동패턴 기반으로 전면 수정</span></div>
+            <div class="act-item"><span class="act-tag">지식담당</span><span class="act-txt" style="margin-left:8px">행동방식 4축 파일 신설 — 조합원리 연결 완료</span></div>
+            <div class="act-item"><span class="act-tag">지식담당</span><span class="act-txt" style="margin-left:8px">대상별맥락 고등학생·직장인 보강</span></div>
+          </div>
+          <div class="card">
+            <div class="card-title">📋 에이전트 현재 상태</div>
+            <div class="info-row"><span class="dot dg"></span><span style="font-size:13px;color:#ddd;margin-left:8px;flex:1">지식담당</span><span class="sbadge s-active">Active</span></div>
+            <div class="info-row"><span class="dot ds"></span><span style="font-size:13px;color:#ddd;margin-left:8px;flex:1">문구담당</span><span class="sbadge s-idle">대기 중</span></div>
+            <div class="info-row"><span class="dot ds"></span><span style="font-size:13px;color:#ddd;margin-left:8px;flex:1">기획담당</span><span class="sbadge s-idle">대기 중</span></div>
+          </div>
+          <div class="card">
+            <div class="card-title">⚠️ 정합성 알림</div>
+            <div style="font-size:12px;color:#facc15;padding:6px 0">경쟁형·비교형 조합 설명이 초안 상태입니다. 확정 전 결과지 문구 작성에 사용 금지.</div>
+            <div style="font-size:12px;color:#555;margin-top:6px">자기효능감향상방식은 행동방식 4축 조합에 포함되지 않음에 유의.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── AGENTS ── -->
+    <div class="page" id="page-agents">
+      <div class="agents-page">
+        <div class="agents-tree">
+          <!-- Root -->
+          <div class="a-node" style="background:#1a1a20;border-color:#333" onclick="selectAgent('root')">
+            <div class="a-icon">⬡</div>
+            <div><div class="a-name">CRATA 시스템</div><div class="a-sub">에이전트 총괄</div></div>
+          </div>
+          <div class="conn-travel-v" style="width:2px;height:28px;background:#242428;position:relative"></div>
+          <!-- Row -->
+          <div style="display:flex;align-items:flex-start;position:relative">
+            <div class="conn-bar-active" style="position:absolute;top:22px;left:calc(50% - 200px);width:400px;height:2px;background:#242428"></div>
+            <div class="conn-col">
+              <div class="conn-travel-v" style="width:2px;height:22px;background:#242428;position:relative"></div>
+              <div class="a-node on" onclick="selectAgent('knowledge')">
+                <div class="a-icon">◈</div>
+                <div><div class="a-name">지식담당</div><div class="a-sub">지식 저작·고도화</div></div>
+                <div class="a-badge">Active</div>
+              </div>
+            </div>
+            <div style="width:100px"></div>
+            <div class="conn-col">
+              <div style="width:2px;height:22px;background:#242428"></div>
+              <div class="a-node" onclick="selectAgent('phrase')">
+                <div class="a-icon">✦</div>
+                <div><div class="a-name">문구담당</div><div class="a-sub">결과지 문구 수정·생성</div></div>
+              </div>
+            </div>
+            <div style="width:100px"></div>
+            <div class="conn-col">
+              <div style="width:2px;height:22px;background:#242428"></div>
+              <div class="a-node" onclick="selectAgent('plan')">
+                <div class="a-icon">◎</div>
+                <div><div class="a-name">기획담당</div><div class="a-sub">프로그램·워크숍 기획</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="manage-panel" id="manage-panel">
+          <div class="panel-section" style="display:flex;align-items:center;gap:12px">
+            <div style="width:40px;height:40px;background:#1e1e22;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px" id="mp-icon">◈</div>
+            <div style="flex:1">
+              <div style="font-size:15px;font-weight:700;color:#fff" id="mp-name">에이전트를 선택하세요</div>
+              <div style="font-size:11px;color:#555;margin-top:2px" id="mp-status">—</div>
+            </div>
+          </div>
+          <div class="panel-section">
+            <div class="panel-sec-title">역할 설명</div>
+            <textarea class="edit-field" id="mp-role" rows="3" placeholder="역할을 입력하세요"></textarea>
+          </div>
+          <div class="panel-section">
+            <div class="panel-sec-title">담당 파일 · 접근 권한</div>
+            <div id="mp-files"><div style="color:#333;font-size:12px">선택 후 표시됩니다.</div></div>
+            <button class="add-btn" onclick="addFileRow()">+ 파일 경로 추가</button>
+          </div>
+          <div class="panel-section">
+            <div class="panel-sec-title">사용 가능한 Skills</div>
+            <div id="mp-skills"><div style="color:#333;font-size:12px">선택 후 표시됩니다.</div></div>
+          </div>
+          <div class="panel-section">
+            <div class="panel-sec-title">최근 작업 히스토리</div>
+            <div id="mp-history"><div style="color:#333;font-size:12px">선택 후 표시됩니다.</div></div>
+          </div>
+          <button class="save-btn" onclick="saveAgent()">변경사항 저장</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TASKS ── -->
+    <div class="page" id="page-tasks">
+      <div class="tasks-layout">
+        <div class="card task-list" style="padding:10px">
+          <div style="font-size:11px;color:#444;text-transform:uppercase;letter-spacing:.08em;padding:4px 8px;margin-bottom:6px">진행 중 (3)</div>
+          <div class="t-item sel" onclick="selectTask(0,this)">
+            <div class="t-row"><span class="sbadge s-active">Active</span></div>
+            <div class="t-name">조직검사 조합 설명 작성</div>
+            <div class="t-meta">지식담당 주도 · 23개 미완성</div>
+          </div>
+          <div class="t-item" onclick="selectTask(1,this)">
+            <div class="t-row"><span class="sbadge s-pending">Pending</span></div>
+            <div class="t-name">중심역량 결과지 문구 초안</div>
+            <div class="t-meta">문구담당 · 지식 확정 후 시작</div>
+          </div>
+          <div class="t-item" onclick="selectTask(2,this)">
+            <div class="t-row"><span class="sbadge s-pending">Pending</span></div>
+            <div class="t-name">대표님 검수용 docx 준비</div>
+            <div class="t-meta">기획담당 · 전 단계 완료 후</div>
+          </div>
+          <div style="font-size:11px;color:#444;text-transform:uppercase;letter-spacing:.08em;padding:4px 8px;margin:10px 0 6px">완료 (3)</div>
+          <div class="t-item" onclick="selectTask(3,this)">
+            <div class="t-row"><span class="sbadge s-done">Done</span></div>
+            <div class="t-name">16행동유형 정의 재작성</div>
+            <div class="t-meta">지식담당 · 2026-05-22</div>
+          </div>
+          <div class="t-item" onclick="selectTask(4,this)">
+            <div class="t-row"><span class="sbadge s-done">Done</span></div>
+            <div class="t-name">행동방식 4축 파일 신설</div>
+            <div class="t-meta">지식담당 · 2026-05-22</div>
+          </div>
+          <div class="t-item" onclick="selectTask(5,this)">
+            <div class="t-row"><span class="sbadge s-done">Done</span></div>
+            <div class="t-name">조직 10유형 초안 작성</div>
+            <div class="t-meta">지식담당 · 2026-05-22</div>
+          </div>
+        </div>
+        <div class="task-detail" id="task-detail">
+          <div class="detail-header">
+            <div class="t-row"><span class="sbadge s-active" id="t-status">Active</span></div>
+            <div class="detail-title" id="t-title">조직검사 조합 설명 작성</div>
+            <div class="detail-meta" id="t-meta">지식담당 주도 · 조합 설명 23개 미완성 · 2026-05-22 시작</div>
+          </div>
+          <div class="assignment-chart" id="assignment-chart">
+            <div class="card-title" style="align-self:flex-start">에이전트 분배</div>
+            <div id="chart-content" style="display:flex;flex-direction:column;align-items:center;gap:0;width:100%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── COVERAGE ── -->
+    <div class="page" id="page-coverage">
+      <div class="card" style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:16px;font-size:12px">
+          <span><span class="dot dg" style="display:inline-block;margin-right:5px"></span>완성</span>
+          <span><span class="dot dy" style="display:inline-block;margin-right:5px"></span>초안</span>
+          <span><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#2a2a2e;margin-right:5px"></span>미작성</span>
+          <span style="margin-left:auto;color:#555">조직행동 검사 기준 · 나이대 구분 없음</span>
+        </div>
+      </div>
+      <div class="card cov-wrap">
+        <table class="cov-table">
+          <thead>
+            <tr>
+              <th style="text-align:left">유형</th>
+              <th>중심역량</th>
+              <th>핵심역량</th>
+              <th>성장행동역량</th>
+              <th>잠재역량</th>
+            </tr>
+          </thead>
+          <tbody id="cov-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── LOG ── -->
+    <div class="page" id="page-log">
+      <div class="card">
+        <div class="card-title">수정 로그 — decisions/</div>
+        <div id="log-list"></div>
+      </div>
+    </div>
+
+    <!-- ── VIDEO ── -->
+    <div class="page" id="page-video">
+      <div class="g2" style="margin-bottom:12px">
+        <div class="card">
+          <div class="card-title">현재 인코딩</div>
+          <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px">
+            <div style="font-size:34px;font-weight:800;color:#fff;line-height:1" id="v-pct-big">—</div>
+            <div style="font-size:14px;color:#555">%</div>
+            <div style="margin-left:auto;font-size:12px;color:#555" id="v-task-label"></div>
+          </div>
+          <div style="background:#1e1e22;border-radius:4px;height:8px;overflow:hidden;margin-bottom:10px">
+            <div id="v-bar" style="height:100%;background:linear-gradient(90deg,#4285f4,#74b0ff);border-radius:4px;transition:width .5s ease;width:0%"></div>
+          </div>
+          <div style="font-size:12px;background:#1a1a1e;border-radius:6px;padding:8px 10px;color:#9aa0a6;word-break:break-all" id="v-current-file">-</div>
+          <div style="font-size:11px;color:#555;margin-top:8px" id="v-updated"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">전체 파일 현황</div>
+          <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px">
+            <div style="font-size:34px;font-weight:800;color:#fff;line-height:1" id="v-done-big">—</div>
+            <div style="font-size:14px;color:#555">/ <span id="v-total-big" style="color:#555">—</span></div>
+          </div>
+          <div style="background:#1e1e22;border-radius:4px;height:8px;overflow:hidden;margin-bottom:10px">
+            <div id="v-files-bar" style="height:100%;background:linear-gradient(90deg,#34a853,#68d87c);border-radius:4px;transition:width .5s ease;width:0%"></div>
+          </div>
+          <div style="font-size:11px;color:#555" id="v-started"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">완료된 파일</div>
+        <div id="v-completed-list" style="font-size:12px;color:#555;text-align:center;padding:16px 0">
+          데스크탑에서 인코딩 실행 시 자동으로 표시됩니다.
+        </div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">사용법</div>
+        <div style="font-size:12px;color:#555;line-height:1.9">
+          <div><span style="color:#4285f4">데스크탑</span>  →  <code style="background:#1a1a1e;padding:2px 6px;border-radius:4px;color:#ddd">python subtitle_agent.py final</code>  →  인코딩 중 자동 갱신</div>
+          <div style="margin-top:4px"><span style="color:#4285f4">이 화면</span>  →  10초마다 자동 새로고침 (서버 실행 시)</div>
+          <div style="margin-top:4px"><span style="color:#555">서버:</span>  <code style="background:#1a1a1e;padding:2px 6px;border-radius:4px;color:#ddd">python start_dashboard.py</code>  (OneDrive\대시보드 폴더)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── REVIEW ── -->
+    <div class="page" id="page-review">
+      <div class="g2" style="margin-bottom:12px">
+        <div class="card">
+          <div class="card-title">검수 사이클 현황</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+            <span style="font-size:12px;color:#555">export</span>
+            <div class="stage-dot done"></div>
+            <span style="font-size:12px;color:#555">대표님 검토</span>
+            <div class="stage-dot active"></div>
+            <span style="font-size:12px;color:#555">apply</span>
+            <div class="stage-dot wait"></div>
+          </div>
+          <div style="font-size:12px;color:#facc15;margin-top:10px">현재 단계: 대표님 검토 대기 중</div>
+        </div>
+        <div class="card">
+          <div class="card-title">다음 export 대상</div>
+          <div style="font-size:13px;color:#ddd;margin-bottom:6px">조직검사 지식 파일 (확정된 항목)</div>
+          <div style="font-size:12px;color:#555">조건: 조합 설명 초안→확정 이후 export 가능</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">검수 이력</div>
+        <div class="rev-item">
+          <div class="rev-num" style="color:#60a5fa">1</div>
+          <div class="rev-info">
+            <div class="rev-title">조직 10유형 정의 초안 — 검수 완료</div>
+            <div class="rev-meta">export 2026-05-22 · apply 2026-05-22</div>
+          </div>
+          <div><span class="sbadge s-done">완료</span></div>
+        </div>
+        <div class="rev-item">
+          <div class="rev-num" style="color:#facc15">2</div>
+          <div class="rev-info">
+            <div class="rev-title">16행동유형 정의 재작성 — 검수 대기</div>
+            <div class="rev-meta">export 2026-05-22 · 대표님 검토 중</div>
+          </div>
+          <div><span class="sbadge s-pending">검토 중</span></div>
+        </div>
+        <div class="rev-item">
+          <div class="rev-num" style="color:#555">3</div>
+          <div class="rev-info">
+            <div class="rev-title">조합 설명 — 미완성</div>
+            <div class="rev-meta">조합 설명 완성 후 export 예정</div>
+          </div>
+          <div><span class="sbadge s-idle">예정</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const pageTitles = {home:'홈',brief:'오늘의 브리핑',agents:'에이전트',tasks:'작업',coverage:'문구 커버리지',log:'수정 로그',review:'검수 현황',video:'영상 편집'};
+
+function nav(id, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  el.classList.add('active');
+  document.getElementById('page-title').textContent = pageTitles[id];
+}
+
+// AGENTS
+const agentData = {
+  knowledge: {
+    name:'지식담당', icon:'◈', status:'Active',
+    role:'유형 정의·조합 설명 저작 및 고도화, 정합성 진단·파급 추적. 지식 파일이 단일 진실 출처가 되도록 유지한다.',
+    files:[
+      {path:'지식/조직검사/', access:'rw'},
+      {path:'지식/개인행동동기검사/', access:'rw'},
+      {path:'decisions/log/', access:'rw'},
+      {path:'결과지문구/', access:'ro'},
+    ],
+    skills:[
+      {name:'revise-knowledge', desc:'지식 수정·고도화', on:true},
+      {name:'audit-phrases', desc:'정합성 점검', on:true},
+      {name:'export-review', desc:'검수 docx 생성', on:false},
+    ],
+    history:[
+      {time:'1시간 전', txt:'비교형 조합 설명 초안 작성'},
+      {time:'3시간 전', txt:'16행동유형 정의 재작성'},
+      {time:'어제', txt:'행동방식 4축 파일 신설'},
+      {time:'어제', txt:'조직 10유형 초안 일괄 작성'},
+    ]
+  },
+  phrase: {
+    name:'문구담당', icon:'✦', status:'대기 중',
+    role:'결과지 화면 문구 수정·생성. 연결키·위치 변경 없이 본문만 다듬고, 모든 수정에 근거를 decisions/에 남긴다.',
+    files:[
+      {path:'결과지문구/*MASTER.md', access:'rw'},
+      {path:'rules/', access:'rw'},
+      {path:'decisions/', access:'rw'},
+      {path:'지식/', access:'ro'},
+    ],
+    skills:[
+      {name:'revise-phrase', desc:'문구 수정·다듬기', on:true},
+      {name:'create-phrase', desc:'새 문구 생성', on:true},
+      {name:'audit-phrases', desc:'정합성 점검', on:true},
+      {name:'export-review', desc:'검수 docx 생성', on:false},
+    ],
+    history:[
+      {time:'3일 전', txt:'개인동기검사 성인 성장형 문구 수정'},
+      {time:'4일 전', txt:'개인동기검사 수확형 결과지 초안'},
+    ]
+  },
+  plan: {
+    name:'기획담당', icon:'◎', status:'대기 중',
+    role:'CRATA 검사를 활용한 프로그램·워크숍·교육 기획안 작성. 파일을 직접 고치지 않고 기획 초안을 돌려준다.',
+    files:[
+      {path:'지식/', access:'ro'},
+      {path:'decisions/', access:'ro'},
+    ],
+    skills:[
+      {name:'create-phrase', desc:'문구 생성 참조', on:false},
+      {name:'export-review', desc:'검수 docx 생성', on:false},
+    ],
+    history:[
+      {time:'1주 전', txt:'조직검사 팀빌딩 워크숍 기획안 초안'},
+    ]
+  },
+};
+
+let currentAgent = null;
+
+function selectAgent(id) {
+  if(id === 'root') return;
+  currentAgent = id;
+  const d = agentData[id];
+  document.querySelectorAll('.a-node').forEach(n => n.classList.remove('sel'));
+  event.currentTarget.classList.add('sel');
+
+  document.getElementById('mp-icon').textContent = d.icon;
+  document.getElementById('mp-name').textContent = d.name;
+  document.getElementById('mp-status').innerHTML = `<span style="color:${d.status==='Active'?'#4ade80':'#555'}">${d.status}</span>`;
+  document.getElementById('mp-role').value = d.role;
+
+  document.getElementById('mp-files').innerHTML = d.files.map((f,i) => `
+    <div class="file-row">
+      <span class="file-badge ${f.access==='rw'?'fb-rw':'fb-ro'}">${f.access==='rw'?'읽기/쓰기':'읽기 전용'}</span>
+      <span class="file-path">${f.path}</span>
+      <span class="del-btn" onclick="removeFile(${i})">×</span>
+    </div>
+  `).join('');
+
+  document.getElementById('mp-skills').innerHTML = d.skills.map((s,i) => `
+    <div class="skill-row">
+      <div>
+        <div class="skill-name">${s.name}</div>
+        <div class="skill-desc">${s.desc}</div>
+      </div>
+      <div class="toggle ${s.on?'on':''}" onclick="toggleSkill('${id}',${i},this)"></div>
+    </div>
+  `).join('');
+
+  document.getElementById('mp-history').innerHTML = d.history.length
+    ? d.history.map(h => `<div class="hist-item"><span class="hist-time">${h.time}</span><span class="hist-txt">${h.txt}</span></div>`).join('')
+    : '<div style="color:#333;font-size:12px">작업 기록 없음</div>';
+}
+
+function toggleSkill(agentId, idx, el) {
+  agentData[agentId].skills[idx].on = !agentData[agentId].skills[idx].on;
+  el.classList.toggle('on');
+}
+
+function removeFile(idx) {
+  if(!currentAgent) return;
+  agentData[currentAgent].files.splice(idx, 1);
+  selectAgentById(currentAgent);
+}
+
+function addFileRow() {
+  if(!currentAgent) return;
+  const path = prompt('파일 경로 입력 (예: 지식/조직검사/)');
+  if(!path) return;
+  const access = confirm('읽기/쓰기 권한? (취소 = 읽기 전용)') ? 'rw' : 'ro';
+  agentData[currentAgent].files.push({path, access});
+  selectAgentById(currentAgent);
+}
+
+function selectAgentById(id) {
+  const fakeEvent = {currentTarget: document.querySelector(`.a-node[onclick="selectAgent('${id}')"]`)};
+  const orig = window.event;
+  Object.defineProperty(window, 'event', {value: fakeEvent, configurable: true});
+  selectAgent(id);
+  Object.defineProperty(window, 'event', {value: orig, configurable: true});
+}
+
+function saveAgent() {
+  if(!currentAgent) return;
+  agentData[currentAgent].role = document.getElementById('mp-role').value;
+  const btn = document.querySelector('.save-btn');
+  btn.textContent = '저장됨 ✓';
+  btn.style.background = '#14532d';
+  setTimeout(() => { btn.textContent = '변경사항 저장'; btn.style.background = ''; }, 1800);
+}
+
+// TASKS
+const tasks = [
+  { title:'조직검사 조합 설명 작성', status:'s-active', statusTxt:'Active', meta:'지식담당 주도 · 조합 설명 23개 미완성 · 2026-05-22 시작',
+    agents:[ {name:'지식담당', icon:'◈', status:'on', stTxt:'Active', stCls:'as-active'}, {name:'문구담당', icon:'✦', status:'pend', stTxt:'Pending', stCls:'as-pending'}, {name:'기획담당', icon:'◎', status:'', stTxt:'Idle', stCls:'as-idle'} ] },
+  { title:'중심역량 결과지 문구 초안', status:'s-pending', statusTxt:'Pending', meta:'문구담당 주도 · 지식 확정 후 시작 예정',
+    agents:[ {name:'지식담당', icon:'◈', status:'pend', stTxt:'Pending', stCls:'as-pending'}, {name:'문구담당', icon:'✦', status:'on', stTxt:'주도', stCls:'as-active'} ] },
+  { title:'대표님 검수용 docx 준비', status:'s-pending', statusTxt:'Pending', meta:'기획담당 주도 · 전 단계 완료 후 진행',
+    agents:[ {name:'기획담당', icon:'◎', status:'', stTxt:'Idle', stCls:'as-idle'}, {name:'문구담당', icon:'✦', status:'', stTxt:'Idle', stCls:'as-idle'} ] },
+  { title:'16행동유형 정의 재작성', status:'s-done', statusTxt:'Done', meta:'지식담당 · 2026-05-22 완료',
+    agents:[ {name:'지식담당', icon:'◈', status:'', stTxt:'완료', stCls:'as-idle'} ] },
+  { title:'행동방식 4축 파일 신설', status:'s-done', statusTxt:'Done', meta:'지식담당 · 2026-05-22 완료',
+    agents:[ {name:'지식담당', icon:'◈', status:'', stTxt:'완료', stCls:'as-idle'} ] },
+  { title:'조직 10유형 초안 작성', status:'s-done', statusTxt:'Done', meta:'지식담당 · 2026-05-22 완료',
+    agents:[ {name:'지식담당', icon:'◈', status:'', stTxt:'완료', stCls:'as-idle'} ] },
+];
+
+function selectTask(idx, el) {
+  document.querySelectorAll('.t-item').forEach(t=>t.classList.remove('sel'));
+  el.classList.add('sel');
+  const t = tasks[idx];
+  document.getElementById('t-status').className = 'sbadge ' + t.status;
+  document.getElementById('t-status').textContent = t.statusTxt;
+  document.getElementById('t-title').textContent = t.title;
+  document.getElementById('t-meta').textContent = t.meta;
+  renderChart(t);
+}
+
+function renderChart(t) {
+  const c = document.getElementById('chart-content');
+  const agentCount = t.agents.length;
+  const nodeW = 164;
+  const gap = 32;
+
+  const hasActive = t.agents.some(a => a.status === 'on');
+  const rootConnCls = hasActive ? 'conn-travel-v' : '';
+  const rootConnStyle = hasActive
+    ? 'width:2px;height:32px;background:#242428;position:relative'
+    : 'width:2px;height:32px;background:#242428';
+
+  let html = `
+    <div style="background:#1e1e22;border:1px solid #333;border-radius:12px;padding:14px 28px;text-align:center;min-width:220px">
+      <div style="font-size:10px;color:#444;text-transform:uppercase;letter-spacing:.06em">작업</div>
+      <div style="font-size:15px;font-weight:600;color:#fff;margin-top:2px">${t.title}</div>
+    </div>
+    <div class="${rootConnCls}" style="${rootConnStyle}"></div>
+    <div style="display:flex;align-items:flex-start;gap:${gap}px;position:relative">
+  `;
+
+  if(agentCount > 1) {
+    const barW = (agentCount - 1) * (nodeW + gap);
+    const barCls = hasActive ? 'conn-bar-active' : '';
+    html += `<div class="${barCls}" style="position:absolute;top:0;left:${nodeW/2}px;width:${barW}px;height:2px;background:#242428"></div>`;
+  }
+
+  t.agents.forEach(a => {
+    const vCls = a.status === 'on' ? 'conn-travel-v' : a.status === 'pend' ? 'conn-travel-v pend' : '';
+    const vStyle = 'width:2px;height:26px;background:#242428;position:relative';
+    html += `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:0">
+        <div class="${vCls}" style="${vStyle}"></div>
+        <div class="assign-card ${a.status}" style="min-width:${nodeW}px;position:relative">
+          ${a.stTxt !== 'Idle' ? `<div class="assign-status ${a.stCls}">${a.stTxt}</div>` : ''}
+          <div style="width:28px;height:28px;background:#1e1e22;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px">${a.icon}</div>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#fff">${a.name}</div>
+            <div style="display:flex;align-items:center;gap:5px;margin-top:2px">
+              <div class="dot ${a.status==='on'?'dg':a.status==='pend'?'dy':'ds'}"></div>
+              <span style="font-size:11px;color:#555">${a.stTxt}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+  html += `</div>`;
+  c.innerHTML = html;
+}
+
+renderChart(tasks[0]);
+
+// COVERAGE
+const types = ['과제형','관계형','직관형','경험형','설계형','기술형','전술형','전략형','경쟁형','비교형'];
+const ways = ['목적성취','목적성취','정보처리','정보처리','능력표현','능력표현','목표실행','목표실행','자기효능감','자기효능감'];
+const cols = ['중심역량','핵심역량','성장행동역량','잠재역량'];
+const covData = [
+  ['done','done','draft','empty'],
+  ['done','draft','empty','empty'],
+  ['draft','empty','empty','empty'],
+  ['empty','empty','empty','empty'],
+  ['done','done','draft','draft'],
+  ['done','draft','empty','empty'],
+  ['draft','empty','empty','empty'],
+  ['empty','empty','empty','empty'],
+  ['empty','empty','empty','empty'],
+  ['empty','empty','empty','empty'],
+];
+const covLabels = {done:'완성',draft:'초안',empty:'—'};
+
+let tbody = '';
+types.forEach((tp,i) => {
+  tbody += `<tr>
+    <td class="type-lbl">${tp}<br><span style="font-size:10px;color:#333">${ways[i]}</span></td>
+    ${covData[i].map(s=>`<td><div class="c-cell c-${s}">${covLabels[s]}</div></td>`).join('')}
+  </tr>`;
+});
+document.getElementById('cov-body').innerHTML = tbody;
+
+// LOG
+const logs = [
+  { agent:'지식담당', time:'2026-05-23', title:'대상별맥락 직장인 보강', reason:'직장인 맥락에서 조직유형별 강점이 더 구체적으로 표현될 필요가 있어 핵심 작동 조건 보강.' },
+  { agent:'지식담당', time:'2026-05-23', title:'대상별맥락 고등학생 보강', reason:'고등학생 진로탐색 맥락에서 유형별 설명이 추상적이어서 구체 상황 예시 추가.' },
+  { agent:'지식담당', time:'2026-05-22', title:'16행동유형 정의 재작성', reason:'비트패턴 기반 조합으로 재정의. 기존 정의가 유형 간 경계가 불분명하여 전면 수정.' },
+  { agent:'지식담당', time:'2026-05-22', title:'행동방식 4축 파일 신설', reason:'조합원리 설명에서 4축이 자주 언급되나 별도 파일이 없어 파악이 어려워 신설.' },
+  { agent:'지식담당', time:'2026-05-22', title:'조직 10유형 초안 일괄 작성', reason:'결과지 문구 작성을 위한 지식 기반 마련. 초안으로 작성 후 순차 확정 예정.' },
+  { agent:'지식담당', time:'2026-05-22', title:'성장역량 인지 정의 수정', reason:'기존 정의가 "성장을 추구하는" 방향성과 혼용되어 역량 자리 의미로 명확히 재정의.' },
+];
+
+// ── VIDEO STATUS (10초마다 video_status.json 폴링) ──────────────────────────
+
+function fmtTime(iso) {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  } catch { return ''; }
+}
+
+const TASK_LABELS = {transcribe:'전사', diarize:'화자분리', hardcode:'하드코딩', final:'최종 인코딩'};
+
+function applyVideoStatus(data) {
+  if (!data) return;
+
+  const pct      = data.progress_pct ?? 0;
+  const done     = data.done ?? 0;
+  const total    = data.total ?? 0;
+  const filePct  = total > 0 ? Math.round(done / total * 100) : 0;
+  const taskTxt  = TASK_LABELS[data.task] || data.task || '';
+  const finished = !!data.finished_at;
+
+  // 사이드바 닷
+  const navDot = document.getElementById('nav-video-dot');
+  if (navDot) navDot.style.background = finished ? '#4ade80' : pct > 0 ? '#facc15' : '#4285f4';
+
+  // 홈 미니 카드
+  const homeCard = document.getElementById('home-video-card');
+  if (homeCard) homeCard.style.display = '';
+  const el = id => document.getElementById(id);
+  if (el('home-video-task'))    el('home-video-task').textContent  = taskTxt;
+  if (el('home-video-file'))    el('home-video-file').textContent  = data.current_file || (finished ? '모두 완료' : '—');
+  if (el('home-video-pct'))     el('home-video-pct').textContent   = pct + '%';
+  if (el('home-video-bar'))     el('home-video-bar').style.width   = pct + '%';
+  if (el('home-video-files'))   el('home-video-files').textContent = done + ' / ' + total;
+  if (el('home-video-updated')) el('home-video-updated').textContent = fmtTime(data.updated_at);
+
+  // 영상 전용 페이지
+  if (el('v-pct-big'))      el('v-pct-big').textContent  = pct;
+  if (el('v-bar'))          el('v-bar').style.width       = pct + '%';
+  if (el('v-task-label'))   el('v-task-label').textContent = taskTxt;
+  if (el('v-done-big'))     el('v-done-big').textContent  = done;
+  if (el('v-total-big'))    el('v-total-big').textContent = total;
+  if (el('v-files-bar'))    el('v-files-bar').style.width = filePct + '%';
+  if (el('v-updated'))      el('v-updated').textContent   = '마지막 갱신: ' + fmtTime(data.updated_at);
+  if (el('v-started'))      el('v-started').textContent   = data.started_at ? '시작: ' + fmtTime(data.started_at) : '';
+
+  if (el('v-current-file')) {
+    if (data.current_file) {
+      el('v-current-file').innerHTML = '처리 중: <span style="color:#e8eaed">' + data.current_file + '</span>';
+    } else if (finished) {
+      el('v-current-file').innerHTML = '<span style="color:#4ade80">✓ 모든 파일 완료</span>';
+    } else {
+      el('v-current-file').textContent = '—';
+    }
+  }
+
+  const listEl = el('v-completed-list');
+  if (listEl && data.completed && data.completed.length > 0) {
+    listEl.innerHTML = data.completed.slice().reverse().map(name =>
+      `<div class="act-item"><span style="color:#4ade80;margin-right:6px">✓</span><span style="color:#9aa0a6">${name}</span></div>`
+    ).join('');
+  }
+}
+
+async function fetchVideoStatus() {
+  try {
+    const r = await fetch('video_status.json?t=' + Date.now());
+    if (r.ok) applyVideoStatus(await r.json());
+  } catch { /* 서버 없이 파일://로 열었을 때 */ }
+}
+
+fetchVideoStatus();
+setInterval(fetchVideoStatus, 10000);
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+document.getElementById('log-list').innerHTML = logs.map((l,i) => `
+  <div class="tl-item">
+    <div class="tl-dot-col"><div class="tl-dot" style="background:${i===0?'#4ade80':i<3?'#60a5fa':'#333'}"></div>${i<logs.length-1?'<div class="tl-line"></div>':''}</div>
+    <div class="tl-content">
+      <div class="tl-head"><span class="tl-agent">${l.agent}</span><span class="tl-time">${l.time}</span></div>
+      <div class="tl-title">${l.title}</div>
+      <div class="tl-reason">${l.reason}</div>
+    </div>
+  </div>
+`).join('');
+</script>
+</body>
+</html>
