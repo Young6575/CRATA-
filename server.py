@@ -249,6 +249,29 @@ def browse_video_files(raw_path=''):
     }
 
 
+def resolve_video_preview_path(raw_path=''):
+    raw_path = str(raw_path or '').strip()
+    if not raw_path:
+        return None, '영상 경로가 비어 있습니다.'
+    try:
+        target = pathlib.Path(raw_path).expanduser().resolve()
+    except Exception as exc:
+        return None, f'경로를 해석할 수 없습니다: {exc}'
+    if not target.exists():
+        return None, '해당 영상 경로가 존재하지 않습니다.'
+    if target.is_dir():
+        candidates = sorted(
+            [p for p in target.iterdir() if p.is_file() and p.suffix.lower() in VIDEO_EXTENSIONS],
+            key=lambda p: p.name.lower(),
+        )
+        if not candidates:
+            return None, '이 폴더에는 미리보기 가능한 영상 파일이 없습니다.'
+        target = candidates[0]
+    if not target.is_file() or target.suffix.lower() not in VIDEO_EXTENSIONS:
+        return None, '미리보기는 영상 파일만 지원합니다.'
+    return target, ''
+
+
 def video_upload_dir():
     settings = read_local_settings()
     video_settings = settings.get('video') if isinstance(settings.get('video'), dict) else {}
@@ -2482,6 +2505,11 @@ class CrataHandler(BaseHTTPRequestHandler):
             browse_path = (query.get('path') or [''])[0]
             self.send_json_or_jsonp(browse_video_files(browse_path), parsed.query)
 
+        elif path == '/api/video/preview':
+            query = parse_qs(parsed.query)
+            preview_path = (query.get('path') or [''])[0]
+            self.stream_video_preview(preview_path)
+
         elif path == '/api/video/edit':
             self.send_json_or_jsonp(read_video_edit_queue(), parsed.query)
 
@@ -2524,6 +2552,57 @@ class CrataHandler(BaseHTTPRequestHandler):
         else:
             self.send_response(404)
             self.end_headers()
+
+    def stream_video_preview(self, raw_path):
+        fpath, error = resolve_video_preview_path(raw_path)
+        if error:
+            self.send_json({'ok': False, 'error': error}, 404)
+            return
+
+        file_size = fpath.stat().st_size
+        range_header = self.headers.get('Range') or ''
+        start = 0
+        end = file_size - 1
+        status = 200
+
+        match = re.match(r'bytes=(\d*)-(\d*)', range_header)
+        if match:
+            status = 206
+            if match.group(1):
+                start = int(match.group(1))
+            if match.group(2):
+                end = int(match.group(2))
+            end = min(end, file_size - 1)
+            if start > end or start >= file_size:
+                self.send_response(416)
+                self.send_header('Content-Range', f'bytes */{file_size}')
+                self.end_headers()
+                return
+
+        length = end - start + 1
+        mime, _ = mimetypes.guess_type(str(fpath))
+        self.send_response(status)
+        self.send_header('Content-Type', mime or 'video/mp4')
+        self.send_header('Accept-Ranges', 'bytes')
+        self.send_header('Content-Length', str(length))
+        self.send_header('Content-Disposition', f'inline; filename="{fpath.name}"')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        if status == 206:
+            self.send_header('Content-Range', f'bytes {start}-{end}/{file_size}')
+        self.end_headers()
+
+        try:
+            with fpath.open('rb') as src:
+                src.seek(start)
+                remaining = length
+                while remaining > 0:
+                    chunk = src.read(min(1024 * 1024, remaining))
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    remaining -= len(chunk)
+        except (BrokenPipeError, ConnectionResetError):
+            return
 
     def do_POST(self):
         path = urlparse(self.path).path

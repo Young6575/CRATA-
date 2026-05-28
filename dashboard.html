@@ -6100,7 +6100,7 @@ body {
         <div class="card-title" style="margin-bottom: 10px;">새로운 인코딩 태스크 요청</div>
         <div style="display: flex; flex-direction: column; gap: 10px;">
           <!-- 경로 입력 -->
-          <div style="display: grid; grid-template-columns: minmax(0,1fr) auto auto auto; gap: 12px; align-items: center;">
+          <div style="display: grid; grid-template-columns: minmax(0,1fr) auto auto auto auto; gap: 12px; align-items: center;">
             <div style="position: relative; display: flex; align-items: center;">
               <span style="position: absolute; left: 12px; font-family: var(--font-mono); color: var(--text-muted); font-size: 13px;">$</span>
               <input type="text" id="video-path-input" placeholder="데스크탑 서버의 영상 폴더 또는 파일 경로... (예: D:/CRATA_Video_Work/source)" style="width: 100%; padding: 10px 14px 10px 28px; border-radius: var(--radius-md); background: var(--bg-input); border: 1px solid var(--border); color: var(--text-white); font-size: 13px; font-family: var(--font-mono); outline: none; transition: var(--transition);" onfocus="this.style.borderColor='var(--border-focus)'; this.style.backgroundColor='var(--bg-input-focus)'" onblur="this.style.borderColor='var(--border)'; this.style.backgroundColor='var(--bg-input)'">
@@ -6111,6 +6111,9 @@ body {
             <input type="file" id="video-encoding-upload-input" accept=".mp4,.mov,.mkv,.avi,.webm,.m4v,.mts,.m2ts,video/*" multiple style="display:none;" onchange="uploadCurrentDeviceVideosForEncoding(this.files)">
             <button onclick="openVideoBrowser('video-path-input')" style="padding: 10px 14px; border-radius: var(--radius-md); background: var(--bg-input); border: 1px solid var(--border); color: var(--text-hover); font-size: 13px; font-weight: 700; cursor: pointer; transition: var(--transition); white-space: nowrap;">
               데스크탑에서 선택
+            </button>
+            <button onclick="previewVideoPathFromInput('video-path-input')" style="padding: 10px 14px; border-radius: var(--radius-md); background: var(--bg-input); border: 1px solid var(--border); color: var(--text-hover); font-size: 13px; font-weight: 700; cursor: pointer; transition: var(--transition); white-space: nowrap;">
+              미리보기
             </button>
             <button onclick="startVideoEncoding()" style="padding: 10px 20px; border-radius: var(--radius-md); background: var(--green); border: none; color: var(--bg); font-size: 13.5px; font-weight: 700; cursor: pointer; transition: var(--transition); display: flex; align-items: center; gap: 8px;">
               인코딩 시작 <span>▶</span>
@@ -6273,6 +6276,21 @@ body {
       </div>
     </div>
 
+    <div id="video-preview-modal" style="display:none; position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,0.78); backdrop-filter:blur(10px); align-items:center; justify-content:center; padding:24px;">
+      <div style="width:min(1040px, 94vw); max-height:88vh; background:var(--bg-panel); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); display:flex; flex-direction:column; overflow:hidden;">
+        <div style="padding:14px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <div style="min-width:0;">
+            <div id="video-preview-title" style="font-size:15px; font-weight:800; color:var(--text-white); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">영상 미리보기</div>
+            <div id="video-preview-path" style="font-size:11.5px; color:var(--text-muted); margin-top:4px; font-family:var(--font-mono); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></div>
+          </div>
+          <button onclick="closeVideoPreview()" style="width:34px;height:34px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-input);color:var(--text-hover);cursor:pointer;font-size:18px;">×</button>
+        </div>
+        <div style="background:#05070a; padding:10px;">
+          <video id="video-preview-player" controls preload="metadata" style="width:100%; max-height:70vh; display:block; background:#000; border-radius:var(--radius-sm);"></video>
+        </div>
+      </div>
+    </div>
+
     <!-- ── 7-1. VIDEO EDIT PAGE ── -->
     <div class="page" id="page-video-edit">
       <div style="margin-bottom: 24px;">
@@ -6307,12 +6325,13 @@ body {
           <!-- 대상 영상 경로 -->
           <div>
             <span style="font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 8px;">대상 영상/폴더 경로 (Source Path)</span>
-            <div style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:center;">
+            <div style="display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:8px; align-items:center;">
               <div style="position: relative; display: flex; align-items: center;">
                 <span style="position: absolute; left: 12px; font-family: var(--font-mono); color: var(--text-muted); font-size: 12px;">$</span>
                 <input type="text" id="video-edit-path-input" value="C:/CRATA_Assets/Video/2026_05" placeholder="소스 폴더 또는 파일 경로..." style="width: 100%; padding: 8px 12px 8px 24px; border-radius: var(--radius-sm); background: var(--bg-input); border: 1px solid var(--border); color: var(--text-white); font-size: 12px; font-family: var(--font-mono); outline: none; transition: var(--transition);" oninput="updateCliCommand()" onfocus="this.style.borderColor='var(--border-focus)'; this.style.backgroundColor='var(--bg-input-focus)'" onblur="this.style.borderColor='var(--border)'; this.style.backgroundColor='var(--bg-input)'">
               </div>
               <button onclick="openVideoBrowser('video-edit-path-input')" style="padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-input);color:var(--text-hover);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">선택</button>
+              <button onclick="previewVideoPathFromInput('video-edit-path-input')" style="padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-input);color:var(--text-hover);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">미리보기</button>
             </div>
           </div>
 
@@ -11132,6 +11151,48 @@ function closeVideoBrowser() {
   if (modal) modal.style.display = 'none';
 }
 
+function videoPathName(path) {
+  const value = String(path || '');
+  return value.split(/[\\/]/).filter(Boolean).pop() || '영상 미리보기';
+}
+
+function previewDesktopVideo(path) {
+  const sourcePath = String(path || '').trim();
+  if (!sourcePath) {
+    showToast('미리보기할 영상 경로가 비어 있습니다.', 'warning');
+    return;
+  }
+  const modal = document.getElementById('video-preview-modal');
+  const player = document.getElementById('video-preview-player');
+  const title = document.getElementById('video-preview-title');
+  const pathEl = document.getElementById('video-preview-path');
+  if (!modal || !player) return;
+  if (title) title.textContent = videoPathName(sourcePath);
+  if (pathEl) pathEl.textContent = sourcePath;
+  player.pause();
+  player.removeAttribute('src');
+  player.load();
+  player.src = `${SERVER_URL}/api/video/preview?path=${encodeURIComponent(sourcePath)}`;
+  modal.style.display = 'flex';
+  player.load();
+}
+
+function closeVideoPreview() {
+  const modal = document.getElementById('video-preview-modal');
+  const player = document.getElementById('video-preview-player');
+  if (player) {
+    player.pause();
+    player.removeAttribute('src');
+    player.load();
+  }
+  if (modal) modal.style.display = 'none';
+}
+
+function previewVideoPathFromInput(inputId = 'video-path-input') {
+  const path = document.getElementById(inputId)?.value.trim() || '';
+  previewDesktopVideo(path);
+}
+
 async function loadVideoBrowser(path = '') {
   const list = document.getElementById('video-browser-list');
   const current = document.getElementById('video-browser-current');
@@ -11166,15 +11227,18 @@ async function loadVideoBrowser(path = '') {
       const meta = isFolder
         ? (item.meta || '폴더')
         : [item.meta || '영상', videoFileSizeLabel(item.size)].filter(Boolean).join(' · ');
+      const previewButton = isFolder ? '' : `
+          <button onclick="event.stopPropagation(); previewDesktopVideo('${escapeHtml(escapeJs(item.path))}')" style="padding:5px 8px;border-radius:var(--radius-sm);border:1px solid rgba(59,130,246,0.30);background:rgba(59,130,246,0.12);color:#bfdbfe;font-size:11.5px;font-weight:800;cursor:pointer;white-space:nowrap;">미리보기</button>`;
       return `
-        <button onclick="${action}" style="width:100%; display:grid; grid-template-columns:26px minmax(0,1fr) auto; gap:10px; align-items:center; text-align:left; padding:10px 12px; border-radius:var(--radius-md); border:1px solid var(--border); background:rgba(255,255,255,0.018); color:var(--text); cursor:pointer;">
+        <div onclick="${action}" style="width:100%; display:grid; grid-template-columns:26px minmax(0,1fr) auto auto; gap:10px; align-items:center; text-align:left; padding:10px 12px; border-radius:var(--radius-md); border:1px solid var(--border); background:rgba(255,255,255,0.018); color:var(--text); cursor:pointer;">
           <span style="color:${isFolder ? 'var(--accent)' : 'var(--green)'}; font-size:13px;">${icon}</span>
           <span style="min-width:0;">
             <span style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-white); font-size:13px; font-weight:700;">${escapeHtml(item.name)}</span>
             <span style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-muted); font-size:11.5px; margin-top:2px; font-family:var(--font-mono);">${escapeHtml(item.path)}</span>
           </span>
           <span style="font-size:11.5px; color:var(--text-muted); white-space:nowrap;">${escapeHtml(meta)}</span>
-        </button>
+          ${previewButton}
+        </div>
       `;
     }).join('');
   } catch (error) {
