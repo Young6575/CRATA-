@@ -5,6 +5,7 @@
 """
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import json, re, glob, pathlib, mimetypes, os, shutil, socket, subprocess, tempfile, threading, time, uuid
+import sys
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qs, quote
 
@@ -183,6 +184,54 @@ def update_from_git():
         'browser_reload_required': browser_reload_required,
         'message': pull_out or 'Already up to date.',
     }
+
+
+def spawn_replacement_server():
+    launcher = f"""
+import os, socket, subprocess, time
+repo = {json.dumps(str(ROOT))}
+python = {json.dumps(sys.executable)}
+port = int(os.environ.get('CRATA_PORT') or '8765')
+deadline = time.time() + 20
+while time.time() < deadline:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(0.4)
+    try:
+        sock.connect(('127.0.0.1', port))
+        sock.close()
+        time.sleep(0.5)
+    except OSError:
+        try:
+            sock.close()
+        except Exception:
+            pass
+        break
+flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0) if os.name == 'nt' else 0
+subprocess.Popen([python, 'server.py'], cwd=repo, env=os.environ.copy(), creationflags=flags)
+"""
+    flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0) if os.name == 'nt' else 0
+    subprocess.Popen(
+        [sys.executable, '-c', launcher],
+        cwd=str(ROOT),
+        env=os.environ.copy(),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL,
+        creationflags=flags,
+    )
+
+
+def schedule_server_restart(httpd, delay=1.2):
+    def restart():
+        try:
+            spawn_replacement_server()
+        finally:
+            httpd.shutdown()
+
+    timer = threading.Timer(delay, restart)
+    timer.daemon = True
+    timer.start()
+    return True
 
 
 def video_browser_roots():
@@ -2766,7 +2815,14 @@ class CrataHandler(BaseHTTPRequestHandler):
             self.send_json(delete_calendar_event(data))
 
         elif path == '/api/system/update':
-            self.send_json(update_from_git())
+            result = update_from_git()
+            if result.get('ok') and result.get('updated') and result.get('server_restart_required'):
+                try:
+                    result['restart_scheduled'] = schedule_server_restart(self.server)
+                except Exception as exc:
+                    result['restart_scheduled'] = False
+                    result['restart_error'] = str(exc)
+            self.send_json(result)
 
         elif path == '/api/video/edit':
             self.send_json(save_video_edit_action(data))

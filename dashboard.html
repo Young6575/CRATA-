@@ -6511,7 +6511,12 @@ async function runSystemUpdate() {
     const changedCount = Array.isArray(result.changed_files) ? result.changed_files.length : 0;
     if (result.server_restart_required) {
       const localNote = result.local_changes_autostashed ? ' 로컬 수정은 보관 후 다시 적용했습니다.' : '';
-      showToast(`업데이트 ${changedCount}개 적용됨. 서버 재시작이 필요합니다.${localNote}`, 'warning');
+      if (result.restart_scheduled) {
+        showToast(`업데이트 ${changedCount}개 적용됨. 서버를 재시작합니다.${localNote}`, 'warning');
+        waitForServerRestartAndReload();
+      } else {
+        showToast(`업데이트 ${changedCount}개 적용됨. 서버 재시작이 필요합니다.${localNote}`, 'warning');
+      }
     } else if (result.browser_reload_required) {
       const localNote = result.local_changes_autostashed ? ' 로컬 수정은 유지했습니다.' : '';
       showToast(`업데이트 ${changedCount}개 적용됨. 화면을 새로고침합니다.${localNote}`, 'success');
@@ -6527,6 +6532,22 @@ async function runSystemUpdate() {
     if (btn) btn.disabled = false;
     if (label) label.textContent = '업데이트';
   }
+}
+
+async function waitForServerRestartAndReload() {
+  await new Promise(resolve => setTimeout(resolve, 1800));
+  for (let attempt = 0; attempt < 30; attempt++) {
+    try {
+      const res = await fetchWithTimeout(`${SERVER_URL}/api/data?restart=${Date.now()}`, { cache: 'no-store' }, 1500);
+      if (res.ok) {
+        showToast('서버 재시작 완료. 화면을 새로고침합니다.', 'success');
+        setTimeout(() => window.location.reload(), 600);
+        return;
+      }
+    } catch (_) {}
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  showToast('서버 재시작 확인이 지연되고 있습니다. 잠시 후 새로고침하세요.', 'warning');
 }
 
 function escapeHtml(value) {
