@@ -19,7 +19,7 @@ PROCESSED_FILE = ROOT / '처리관리' / '녹음' / 'plaud_processed.json'
 TRANSCRIPTS_DIR = ROOT / '처리관리' / '녹음' / 'transcripts'
 CALENDAR_FILE = ROOT / '처리관리' / 'calendar_events.json'
 LOCAL_SETTINGS_FILE = ROOT / '처리관리' / 'local_settings.json'
-VIDEO_EXTENSIONS = {'.mp4', '.mov', '.mkv', '.avi', '.webm', '.m4v', '.mts', '.m2ts'}
+VIDEO_EXTENSIONS = {'.mp4', '.mov', '.mkv', '.avi', '.webm', '.m4v', '.mts', '.m2ts', '.mxf'}
 VIDEO_EDIT_QUEUE_FILE = ROOT / '처리관리' / 'video_edit_queue.json'
 VIDEO_STATUS_FILE = ROOT / 'video_status.json'
 
