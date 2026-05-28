@@ -2269,6 +2269,14 @@ def create_video_encoding_task(data):
             step_labels.append(label)
     if not step_labels:
         return {'ok': False, 'error': '실행할 인코딩 단계를 하나 이상 선택하세요.'}
+    needs_preview = any(step in step_ids for step in ('burnin', 'encode')) or any(label in step_labels for label in ('자막 하드코딩', '최종 인코딩'))
+    if needs_preview and 'preview' not in step_ids and '미리보기 검수' not in step_labels:
+        id_insert_at = next((idx for idx, step in enumerate(step_ids) if step in ('burnin', 'encode')), len(step_labels))
+        label_insert_at = next((idx for idx, label in enumerate(step_labels) if label in ('자막 하드코딩', '최종 인코딩')), len(step_labels))
+        insert_at = min(id_insert_at, label_insert_at)
+        insert_at = min(insert_at, len(step_labels))
+        step_ids.insert(insert_at, 'preview')
+        step_labels.insert(insert_at, '미리보기 검수')
 
     preset = str(data.get('preset') or 'fast').strip()
     preset_label = str(data.get('presetLabel') or preset).strip()
@@ -2302,7 +2310,9 @@ def create_video_encoding_task(data):
         'steps': step_labels,
         'speaker_count': speaker_count,
         'review_required': True,
-        'review_order': ['raw_transcribe', 'diarize', 'transcript_quality_review', 'crata_term_correction', 'subtitle_encode'],
+        'preview_required': needs_preview,
+        'preview_confirmation_required': needs_preview,
+        'review_order': ['raw_transcribe', 'diarize', 'transcript_quality_review', 'crata_term_correction', 'speaker_review', 'subtitle_preview_review', 'final_encode'],
     }
     write_json_file(VIDEO_STATUS_FILE, status)
 
@@ -2340,13 +2350,17 @@ def create_video_encoding_task(data):
 3. 전사 품질검토: 화자 라벨이 붙은 전사록 전체를 문맥 기준으로 읽고 오인식, 끊김, 반복, 어색한 문장을 검토하세요.
 4. CRATA 용어 교정: 지식/과 결과지문구/의 공식 용어를 기준으로 CRATA 관련 단어를 교정하세요. 의미가 바뀔 수 있는 부분은 임의 확정하지 말고 확인 필요로 남기세요.
 5. 화자분리 검토: 강사/질문자 라벨이 문맥상 뒤바뀐 구간, 짧은 맞장구, 질문 구간을 확인해 수정하거나 확인 필요로 표시하세요.
-6. 검토 완료된 전사/ASS를 기준으로만 자막 하드코딩과 최종 인코딩을 진행하세요.
+6. 자막 미리보기 검수: 검토 완료된 전사/ASS로 30~60초 미리보기 클립을 먼저 생성하세요. 자막 크기, 위치, 하단 여백, 줄 수, 화자 색상, 얼굴/자료 화면 가림 여부를 확인할 수 있어야 합니다.
+7. 미리보기 승인 대기: 미리보기 파일 경로를 남기고 video_status.json에 status를 waiting_preview_review, preview_file, message로 갱신하세요. 사용자가 확인하기 전에는 최종 인코딩을 진행하지 마세요.
+8. 사용자가 미리보기 확인 후 승인한 경우에만 검토 완료된 전사/ASS를 기준으로 자막 하드코딩과 최종 인코딩을 진행하세요.
 
 처리 지침:
 1. 소스 경로가 데스크탑 서버 기준 실제 경로인지 다시 확인하세요.
 2. 선택된 단계만 수행하되, 전사 또는 화자분리를 수행했다면 품질검토와 CRATA 용어 교정은 건너뛰지 마세요.
-3. 결과 파일 경로와 실패한 파일이 있으면 실패 원인을 남기세요.
-4. 완료 후 편집이 필요한 결과물은 처리관리/video_edit_queue.json에 pending_edit 항목으로 추가하세요.
+3. 자막 하드코딩 또는 최종 인코딩 단계가 선택되어 있다면 미리보기 검수는 필수입니다.
+4. 현재 작업 안에서 사용자 승인을 받을 수 없으면 미리보기 생성 후 확인 대기 상태로 멈추고, 최종 인코딩은 다음 승인 작업에서 진행하세요.
+5. 결과 파일 경로와 실패한 파일이 있으면 실패 원인을 남기세요.
+6. 완료 후 편집이 필요한 결과물은 처리관리/video_edit_queue.json에 pending_edit 항목으로 추가하세요.
 """
 
     task, _ = save_task_request({
@@ -2368,6 +2382,7 @@ def create_video_encoding_task(data):
         'videoPresetLabel': preset_label,
         'videoSpeakerCount': speaker_count,
         'videoReviewRequired': True,
+        'videoPreviewRequired': needs_preview,
         'assignments': [
             {'name': '영상담당', 'role': '영상 인코딩 파이프라인 실행', 'progress': 0, 'status': 'pending'},
         ],

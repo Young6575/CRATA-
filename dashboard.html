@@ -6149,6 +6149,9 @@ body {
                 <input type="checkbox" id="chk-step-review" checked style="accent-color: var(--green);"> 품질검토·CRATA 용어교정
               </label>
               <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text); cursor: pointer;">
+                <input type="checkbox" id="chk-step-preview" checked style="accent-color: var(--green);"> 미리보기 검수
+              </label>
+              <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text); cursor: pointer;">
                 <input type="checkbox" id="chk-step-burnin" checked style="accent-color: var(--green);"> 자막 하드코딩
               </label>
               <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text); cursor: pointer;">
@@ -11539,12 +11542,20 @@ function selectedVideoEncodingSteps() {
     ['transcribe', '전사', 'chk-step-transcribe'],
     ['diarize', '화자분리', 'chk-step-diarize'],
     ['review', '품질검토·CRATA 용어교정', 'chk-step-review'],
+    ['preview', '미리보기 검수', 'chk-step-preview'],
     ['burnin', '자막 하드코딩', 'chk-step-burnin'],
     ['encode', '최종 인코딩', 'chk-step-encode'],
   ];
-  return steps
+  const selected = steps
     .filter(([, , id]) => document.getElementById(id)?.checked)
     .map(([id, label]) => ({ id, label }));
+  const needsPreview = selected.some(step => ['burnin', 'encode'].includes(step.id));
+  const hasPreview = selected.some(step => step.id === 'preview');
+  if (needsPreview && !hasPreview) {
+    const insertAt = selected.findIndex(step => ['burnin', 'encode'].includes(step.id));
+    selected.splice(Math.max(insertAt, 0), 0, { id: 'preview', label: '미리보기 검수' });
+  }
+  return selected;
 }
 
 // Register a real CLI task. The old fake progress simulation was intentionally removed.
