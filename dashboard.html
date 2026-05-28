@@ -6124,7 +6124,19 @@ body {
           </div>
 
           <!-- 단계 설정 & 프리셋 -->
-          <div style="display: flex; gap: 40px; border-top: 1px solid var(--border); padding-top: 10px; flex-wrap: wrap;">
+          <div style="display: flex; gap: 28px; border-top: 1px solid var(--border); padding-top: 10px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 11.5px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">화자 수:</span>
+              <select id="video-speaker-count-select" style="background: var(--bg-input); border: 1px solid var(--border); color: var(--text-white); font-size: 12px; padding: 4px 8px; border-radius: var(--radius-sm); outline: none;">
+                <option value="1">1명</option>
+                <option value="2" selected>2명</option>
+                <option value="3">3명</option>
+                <option value="4">4명</option>
+                <option value="5">5명</option>
+                <option value="6">6명 이상</option>
+              </select>
+            </div>
+
             <div style="display: flex; align-items: center; gap: 12px;">
               <span style="font-size: 11.5px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">단계 선택:</span>
               <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text); cursor: pointer;">
@@ -6132,6 +6144,9 @@ body {
               </label>
               <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text); cursor: pointer;">
                 <input type="checkbox" id="chk-step-diarize" checked style="accent-color: var(--green);"> 화자분리
+              </label>
+              <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text); cursor: pointer;">
+                <input type="checkbox" id="chk-step-review" checked style="accent-color: var(--green);"> 품질검토·CRATA 용어교정
               </label>
               <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text); cursor: pointer;">
                 <input type="checkbox" id="chk-step-burnin" checked style="accent-color: var(--green);"> 자막 하드코딩
@@ -8443,6 +8458,29 @@ const agentData = {
     ],
     history: [
       { time: '-7d', txt: '조직검사 팀빌딩 워크숍 기획안 초안' }
+    ]
+  },
+  media: {
+    name: '영상담당',
+    icon: '▶',
+    status: '대기 중',
+    taskNow: '영상 처리 대기',
+    role: '데스크탑 GPU 환경에서 영상 전사, 화자분리, 전사 품질검토, CRATA 용어 교정, 자막 하드코딩, 최종 인코딩을 수행한다.',
+    files: [
+      { path: 'tools/video_agent/', access: 'rw' },
+      { path: '.agents/skills/video-encoding/', access: 'rw' },
+      { path: '처리관리/video_edit_queue.json', access: 'rw' },
+      { path: 'video_status.json', access: 'rw' },
+      { path: '지식/', access: 'ro' },
+      { path: '결과지문구/', access: 'ro' }
+    ],
+    skills: [
+      { name: 'video-encoding', desc: '영상 전사·화자분리·검토·인코딩', on: true },
+      { name: 'large-v3', desc: '로컬 Whisper 전사', on: true },
+      { name: 'ffmpeg', desc: '자막 하드코딩 및 렌더링', on: true }
+    ],
+    history: [
+      { time: '오늘', txt: '화자 수 입력 및 검토 순서 반영' }
     ]
   }
 };
@@ -11500,6 +11538,7 @@ function selectedVideoEncodingSteps() {
   const steps = [
     ['transcribe', '전사', 'chk-step-transcribe'],
     ['diarize', '화자분리', 'chk-step-diarize'],
+    ['review', '품질검토·CRATA 용어교정', 'chk-step-review'],
     ['burnin', '자막 하드코딩', 'chk-step-burnin'],
     ['encode', '최종 인코딩', 'chk-step-encode'],
   ];
@@ -11525,6 +11564,12 @@ async function startVideoEncoding() {
   const presetEl = document.getElementById('video-preset-select');
   const preset = presetEl?.value || 'fast';
   const presetLabel = presetEl?.selectedOptions?.[0]?.textContent || preset;
+  const speakerCountEl = document.getElementById('video-speaker-count-select');
+  const speakerCount = Number(speakerCountEl?.value || 2);
+  if (steps.some(step => step.id === 'diarize') && (!Number.isFinite(speakerCount) || speakerCount < 1)) {
+    showToast('화자분리 전에 화자 수를 선택하십시오.', 'warning');
+    return;
+  }
   const btn = document.getElementById('video-encoding-start-btn');
   if (btn) btn.disabled = true;
   showToast('영상 인코딩 작업을 CLI 대기열에 등록합니다.', 'info');
@@ -11535,6 +11580,7 @@ async function startVideoEncoding() {
       steps,
       preset,
       presetLabel,
+      speakerCount,
       runnerPreference: 'codex',
     }, 20000);
 
@@ -11551,6 +11597,7 @@ async function startVideoEncoding() {
       total_files: 1,
       completed_files: [],
       current_step: 0,
+      speaker_count: speakerCount,
     });
     showToast('영상 인코딩 작업을 등록했습니다. 작업 지시서에서 진행 상황을 확인하세요.', 'success');
     setTimeout(fetchRealData, 1000);

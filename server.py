@@ -2254,12 +2254,17 @@ def create_video_encoding_task(data):
         return {'ok': False, 'error': error}
 
     steps = data.get('steps') if isinstance(data.get('steps'), list) else []
+    step_ids = []
     step_labels = []
     for step in steps:
         if isinstance(step, dict):
+            step_id = str(step.get('id') or '').strip()
             label = str(step.get('label') or step.get('id') or '').strip()
         else:
+            step_id = ''
             label = str(step or '').strip()
+        if step_id:
+            step_ids.append(step_id)
         if label:
             step_labels.append(label)
     if not step_labels:
@@ -2268,6 +2273,17 @@ def create_video_encoding_task(data):
     preset = str(data.get('preset') or 'fast').strip()
     preset_label = str(data.get('presetLabel') or preset).strip()
     runner_preference = data.get('runnerPreference') if data.get('runnerPreference') in ('claude', 'codex') else 'codex'
+    speaker_count = None
+    speaker_count_raw = data.get('speakerCount') if data.get('speakerCount') is not None else data.get('speaker_count')
+    try:
+        speaker_count = int(speaker_count_raw)
+    except (TypeError, ValueError):
+        speaker_count = None
+    if speaker_count is not None and not 1 <= speaker_count <= 12:
+        return {'ok': False, 'error': '화자 수는 1명 이상 12명 이하로 입력하세요.'}
+    if ('diarize' in step_ids or '화자분리' in step_labels) and speaker_count is None:
+        return {'ok': False, 'error': '화자분리 단계 실행 전 화자 수를 선택하세요.'}
+    speaker_count_label = f'{speaker_count}명' if speaker_count is not None else '미지정'
     file_preview = [str(path) for path in files[:20]]
     omitted_count = max(len(files) - len(file_preview), 0)
 
@@ -2284,6 +2300,9 @@ def create_video_encoding_task(data):
         'preset': preset,
         'preset_label': preset_label,
         'steps': step_labels,
+        'speaker_count': speaker_count,
+        'review_required': True,
+        'review_order': ['raw_transcribe', 'diarize', 'transcript_quality_review', 'crata_term_correction', 'subtitle_encode'],
     }
     write_json_file(VIDEO_STATUS_FILE, status)
 
@@ -2291,9 +2310,11 @@ def create_video_encoding_task(data):
 
 중요:
 - 이 작업은 시뮬레이션이 아닙니다. 실제 처리 가능한 로컬 파이프라인을 찾아 실행하세요.
-- 우선 repo 안과 데스크탑 작업 환경에서 subtitle_agent.py, ffmpeg, whisper/전사, diarization, subtitle burn-in, final encode 관련 스크립트를 확인하세요.
+- 우선 repo 안의 .agents/skills/video-encoding/SKILL.md를 읽고 그 절차를 따르세요.
+- 실행 스크립트는 tools/video_agent/subtitle_agent.py를 우선 사용하세요. 아직 이관 전이면 C:\\Users\\wnsdu\\Desktop\\프로젝트\\영상편집에이전트\\subtitle_agent.py를 확인하세요.
+- ffmpeg, faster-whisper large-v3, pyannote diarization, subtitle burn-in, final encode 관련 실행 가능성을 확인하세요.
 - 실행 가능한 파이프라인이 없으면 임의 완료 처리하지 말고 필요한 스크립트/의존성/명령을 결과에 명확히 보고하세요.
-- 진행 중에는 video_status.json을 갱신하세요. 형식은 status(active|requested|done|error), progress, current_file, batch_progress, total_files, completed_files, current_step, message 입니다.
+- 진행 중에는 video_status.json을 갱신하세요. 형식은 status(active|requested|done|error), progress, current_file, batch_progress, total_files, completed_files, current_step, message, speaker_count 입니다.
 - MXF는 웹 미리보기가 안 될 수 있지만 ffmpeg 입력으로는 처리 가능할 수 있습니다.
 
 소스 경로:
@@ -2307,12 +2328,23 @@ def create_video_encoding_task(data):
 선택 단계:
 {', '.join(step_labels)}
 
+화자 수:
+{speaker_count_label}
+
 출력 품질/용도:
 {preset_label} ({preset})
 
+필수 품질검토 순서:
+1. 원본 전사: faster-whisper large-v3로 raw SRT/전사본을 생성하세요. 이 원본은 보존합니다.
+2. 화자분리: 입력된 화자 수({speaker_count_label})를 기준으로 raw 전사 세그먼트에 화자 라벨을 붙이세요.
+3. 전사 품질검토: 화자 라벨이 붙은 전사록 전체를 문맥 기준으로 읽고 오인식, 끊김, 반복, 어색한 문장을 검토하세요.
+4. CRATA 용어 교정: 지식/과 결과지문구/의 공식 용어를 기준으로 CRATA 관련 단어를 교정하세요. 의미가 바뀔 수 있는 부분은 임의 확정하지 말고 확인 필요로 남기세요.
+5. 화자분리 검토: 강사/질문자 라벨이 문맥상 뒤바뀐 구간, 짧은 맞장구, 질문 구간을 확인해 수정하거나 확인 필요로 표시하세요.
+6. 검토 완료된 전사/ASS를 기준으로만 자막 하드코딩과 최종 인코딩을 진행하세요.
+
 처리 지침:
 1. 소스 경로가 데스크탑 서버 기준 실제 경로인지 다시 확인하세요.
-2. 선택된 단계만 수행하세요.
+2. 선택된 단계만 수행하되, 전사 또는 화자분리를 수행했다면 품질검토와 CRATA 용어 교정은 건너뛰지 마세요.
 3. 결과 파일 경로와 실패한 파일이 있으면 실패 원인을 남기세요.
 4. 완료 후 편집이 필요한 결과물은 처리관리/video_edit_queue.json에 pending_edit 항목으로 추가하세요.
 """
@@ -2334,6 +2366,8 @@ def create_video_encoding_task(data):
         'videoSteps': step_labels,
         'videoPreset': preset,
         'videoPresetLabel': preset_label,
+        'videoSpeakerCount': speaker_count,
+        'videoReviewRequired': True,
         'assignments': [
             {'name': '영상담당', 'role': '영상 인코딩 파이프라인 실행', 'progress': 0, 'status': 'pending'},
         ],
