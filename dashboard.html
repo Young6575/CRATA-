@@ -4187,10 +4187,38 @@ body[data-page="home"] .content {
   margin-bottom: 7px;
 }
 .meeting-transcript-box {
-  white-space: pre-wrap;
-  word-break: break-word;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 4px 0 24px;
+}
+.meeting-transcript-row {
+  display: grid;
+  grid-template-columns: 112px minmax(0,1fr);
+  column-gap: 22px;
+  align-items: start;
+}
+.meeting-transcript-time {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  line-height: 1.25;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+.meeting-transcript-speaker {
   font-family: var(--font-sans);
+  color: #f8fafc;
+  font-size: 18px;
+  line-height: 1.25;
+  font-weight: 900;
+  margin-bottom: 10px;
+}
+.meeting-transcript-text {
   color: #dbe4f0;
+  font-size: 17px;
+  line-height: 1.78;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 .meeting-transcript-meta {
   display: flex;
@@ -8594,6 +8622,24 @@ function mergeTaskRecord(existing, incoming) {
   return merged;
 }
 
+function mergeMeetingRecord(existing = {}, incoming = {}) {
+  const merged = { ...existing, ...incoming };
+  const localTranscript = meetingTranscriptText(existing);
+  if (localTranscript && !meetingTranscriptText(incoming)) {
+    merged.transcript = localTranscript;
+    merged.transcript_load_error = existing.transcript_load_error || '';
+  }
+  if (existing.transcript_path && !incoming.transcript_path) merged.transcript_path = existing.transcript_path;
+  if (existing.transcript_chars && !incoming.transcript_chars) merged.transcript_chars = existing.transcript_chars;
+  if (existing.transcript_saved_at && !incoming.transcript_saved_at) merged.transcript_saved_at = existing.transcript_saved_at;
+  return merged;
+}
+
+function mergeMeetingData(existingMeetings = [], incomingMeetings = []) {
+  const existingById = new Map(existingMeetings.map(item => [String(item.id || ''), item]));
+  return incomingMeetings.map(item => mergeMeetingRecord(existingById.get(String(item.id || '')) || {}, item));
+}
+
 function mergeTaskIntoStore(incoming) {
   const incomingKey = taskIdentityKey(incoming);
   const idx = taskData.findIndex(t =>
@@ -8664,7 +8710,7 @@ function applyServerData(data) {
   }
 
   if (Array.isArray(data.meetings)) {
-    meetingData = data.meetings;
+    meetingData = mergeMeetingData(meetingData, data.meetings);
     renderMeetings(data.meetingKpis || {}, data.meetingSync || {});
   }
 
@@ -9925,6 +9971,42 @@ function meetingTranscriptMeta(meeting, transcriptText) {
   };
 }
 
+function normalizeMeetingTranscriptTime(value) {
+  const parts = String(value || '').trim().split(':').map(part => part.padStart(2, '0'));
+  if (parts.length === 2) return `00:${parts[0]}:${parts[1]}`;
+  if (parts.length === 3) return parts.join(':');
+  return String(value || '').trim();
+}
+
+function parseMeetingTranscriptRows(text) {
+  const blocks = String(text || '').split(/\n\s*\n/).map(block => block.trim()).filter(Boolean);
+  return blocks.map(block => {
+    const match = block.match(/^\[([^\]|]+)(?:\s*\|\s*([^\]]+))?\]\s*([\s\S]*)$/);
+    if (!match) {
+      return { time: '', speaker: '', text: block };
+    }
+    return {
+      time: normalizeMeetingTranscriptTime(match[1]),
+      speaker: (match[2] || '').trim(),
+      text: (match[3] || '').trim(),
+    };
+  });
+}
+
+function renderMeetingTranscriptRows(text) {
+  const rows = parseMeetingTranscriptRows(text);
+  if (!rows.length) return '';
+  return rows.map(row => `
+    <div class="meeting-transcript-row">
+      <div class="meeting-transcript-time">${escapeHtml(row.time)}</div>
+      <div>
+        ${row.speaker ? `<div class="meeting-transcript-speaker">${escapeHtml(row.speaker)}</div>` : ''}
+        <div class="meeting-transcript-text">${escapeHtml(row.text).replace(/\n/g, '<br>')}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
 function meetingDetailTabButton(tab, label, extra = '') {
   return `
     <button class="meeting-tab ${activeMeetingDetailTab === tab ? 'active' : ''}" onclick="setMeetingDetailTab('${tab}')">
@@ -10094,7 +10176,7 @@ function renderMeetingDetail(meeting) {
       <span>전사록 ${escapeHtml(transcriptMeta.chars)}</span>
       <span>저장 ${escapeHtml(transcriptMeta.savedAt)}</span>
     </div>
-    <div class="meeting-transcript-box">${escapeHtml(transcriptText)}</div>
+    <div class="meeting-transcript-box">${renderMeetingTranscriptRows(transcriptText)}</div>
   ` : isTranscriptLoading ? `
     <div class="meeting-empty-state">
       <div>
@@ -10160,7 +10242,7 @@ async function syncMeetings() {
   const saved = await postToServer('/api/meetings/sync', {}, 90000);
   if (saved && saved.ok) {
     if (saved.meetings) {
-      meetingData = saved.meetings.meetings || meetingData;
+      meetingData = mergeMeetingData(meetingData, saved.meetings.meetings || meetingData);
       renderMeetings(saved.meetings.kpis || {}, saved.meetings);
     }
     const total = saved.meetings?.kpis?.total ?? meetingData.length;
@@ -10168,7 +10250,7 @@ async function syncMeetings() {
     fetchRealData();
   } else {
     if (saved?.meetings) {
-      meetingData = saved.meetings.meetings || meetingData;
+      meetingData = mergeMeetingData(meetingData, saved.meetings.meetings || meetingData);
       renderMeetings(saved.meetings.kpis || {}, saved.meetings);
     }
     showToast(saved?.error || '회의록 목록 갱신에 실패했습니다.', 'warning');
@@ -10187,7 +10269,7 @@ async function processMeeting(meetingId) {
   if (saved && saved.ok) {
     showToast('회의록 전사록 처리 작업을 등록했습니다.', 'success');
     if (saved.meetings) {
-      meetingData = saved.meetings.meetings || meetingData;
+      meetingData = mergeMeetingData(meetingData, saved.meetings.meetings || meetingData);
       renderMeetings(saved.meetings.kpis || {}, saved.meetings);
     }
     setTimeout(fetchRealData, 1000);
