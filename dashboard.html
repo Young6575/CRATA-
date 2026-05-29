@@ -10156,16 +10156,22 @@ function renderMeetingDetail(meeting) {
 }
 
 async function syncMeetings() {
-  const saved = await postToServer('/api/meetings/sync', { runnerPreference: getMeetingRunner() });
+  showToast('PLAUD 회의록 목록을 갱신하고 있습니다.', 'info');
+  const saved = await postToServer('/api/meetings/sync', {}, 90000);
   if (saved && saved.ok) {
-    showToast('PLAUD 회의록 업데이트 작업을 등록했습니다.', 'success');
     if (saved.meetings) {
       meetingData = saved.meetings.meetings || meetingData;
       renderMeetings(saved.meetings.kpis || {}, saved.meetings);
     }
-    setTimeout(fetchRealData, 1000);
+    const total = saved.meetings?.kpis?.total ?? meetingData.length;
+    showToast(saved.message || `PLAUD 회의록 ${total}건으로 갱신했습니다.`, 'success');
+    fetchRealData();
   } else {
-    showToast('회의록 업데이트 작업 등록에 실패했습니다.', 'warning');
+    if (saved?.meetings) {
+      meetingData = saved.meetings.meetings || meetingData;
+      renderMeetings(saved.meetings.kpis || {}, saved.meetings);
+    }
+    showToast(saved?.error || '회의록 목록 갱신에 실패했습니다.', 'warning');
   }
 }
 

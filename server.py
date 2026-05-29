@@ -3321,7 +3321,6 @@ def enrich_task_result(task, cli_output):
 
 
 def create_meeting_sync_task(data):
-    runner_preference = data.get('runnerPreference') if data.get('runnerPreference') in ('claude', 'codex') else 'claude'
     before_snapshot = meeting_snapshot()
     cache = read_json_file(MEETINGS_FILE, {'meetings': []})
     cache['sync_status'] = 'requested'
@@ -3330,37 +3329,32 @@ def create_meeting_sync_task(data):
     MEETINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
     write_json_file(MEETINGS_FILE, cache)
 
-    desc = """PLAUD 회의록 목록 업데이트 작업입니다.
+    try:
+        state = sync_plaud_meetings_direct()
+    except Exception as exc:
+        state = mark_meeting_sync_error(exc)
+        return {
+            'ok': False,
+            'error': f'PLAUD 목록 동기화 실패: {exc}',
+            'meetings': state,
+        }
 
-이 작업은 "목록 캐시 동기화" 전용입니다. AGENTS.md의 PLAUD 새 녹음 처리 루틴을 실행하지 마세요.
-전사록(get_transcript/get_note/get_file)은 호출하지 말고, 새 녹음이 있어도 사용자에게 처리 여부를 묻지 마세요.
-반드시 list_files 결과만으로 plaud_meetings.json을 갱신하고 sync_status를 "done" 또는 "error"로 끝내세요.
-
-해야 할 일:
-1. Plaud MCP의 list_files로 최근 녹음 목록을 가져오세요.
-2. 처리관리/녹음/plaud_processed.json의 processed[].id와 대조해 처리 완료/미처리를 구분하세요.
-3. 처리관리/녹음/plaud_meetings.json을 갱신하세요. 구조는 { "updated_at": ISO시간, "sync_status": "done", "meetings": [{ "id", "title", "recorded_at", "created_at", "duration", "status" }] } 입니다.
-4. 이 단계에서는 전사록 전체를 읽지 말고 목록만 업데이트하세요.
-5. 오류가 있으면 sync_status를 "error"로 두고 대시보드 결과에 원인을 간단히 남기세요.
-"""
-    task, fpath = save_task_request({
-        'title': 'PLAUD 회의록 목록 업데이트',
-        'desc': desc,
-        'type': 'plaud_sync',
-        'priority': 'normal',
-        'priorityLbl': '보통',
-        'agent': 'plan',
-        'agentName': '기획담당',
-        'runnerPreference': runner_preference,
-        'categoryId': 'meeting-minutes',
-        'categoryName': '회의록 처리',
-        'meetingSyncBefore': before_snapshot,
-        'assignments': [
-            {'name': '기획담당', 'role': 'PLAUD 목록 동기화', 'progress': 0, 'status': 'pending'},
-        ],
-    }, start=False)
-    start_meeting_sync_worker(fpath)
-    return {'ok': True, 'task': task, 'meetings': read_meetings_state()}
+    after_snapshot = meeting_snapshot()
+    before_ids = set(before_snapshot.get('ids') or [])
+    after_ids = set(after_snapshot.get('ids') or [])
+    new_ids = sorted(after_ids - before_ids)
+    removed_ids = sorted(before_ids - after_ids)
+    return {
+        'ok': True,
+        'meetings': state,
+        'syncResult': {
+            'before': before_snapshot,
+            'after': after_snapshot,
+            'newCount': len(new_ids),
+            'removedCount': len(removed_ids),
+        },
+        'message': f"PLAUD 회의록 {after_snapshot.get('total', 0)}건으로 갱신했습니다.",
+    }
 
 
 def create_meeting_process_task(data):
