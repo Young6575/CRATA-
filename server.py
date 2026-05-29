@@ -2881,7 +2881,13 @@ def enrich_task_result(task, cli_output):
         if after.get('latest_title'):
             lines.append(f"- 최신 회의록: {after.get('latest_title')}")
             lines.append(f"- 최신 생성 시각: {after.get('latest_created_at') or after.get('latest_recorded_at') or '알 수 없음'}")
+        stale_sync = after.get('sync_status') == 'requested'
         lines.append(f"- 목록 상태: {after.get('sync_status') or 'unknown'}")
+        if stale_sync:
+            task['status'] = 'error'
+            task['statusLbl'] = '실패'
+            task['error'] = 'PLAUD 목록 동기화가 완료되지 않았습니다. plaud_meetings.json의 sync_status가 requested 상태로 남았습니다.'
+            lines.append('- 동기화 오류: 작업은 종료됐지만 목록 캐시가 requested 상태로 남았습니다.')
 
         task['syncResult'] = {
             'before': before,
@@ -2889,6 +2895,7 @@ def enrich_task_result(task, cli_output):
             'newCount': len(new_ids),
             'removedCount': len(removed_ids),
             'newTitles': new_titles,
+            'syncIncomplete': stale_sync,
         }
         task['result'] = prepend_summary('\n'.join(lines), cli_output)
         return
@@ -2944,6 +2951,10 @@ def create_meeting_sync_task(data):
     write_json_file(MEETINGS_FILE, cache)
 
     desc = """PLAUD 회의록 목록 업데이트 작업입니다.
+
+이 작업은 "목록 캐시 동기화" 전용입니다. AGENTS.md의 PLAUD 새 녹음 처리 루틴을 실행하지 마세요.
+전사록(get_transcript/get_note/get_file)은 호출하지 말고, 새 녹음이 있어도 사용자에게 처리 여부를 묻지 마세요.
+반드시 list_files 결과만으로 plaud_meetings.json을 갱신하고 sync_status를 "done" 또는 "error"로 끝내세요.
 
 해야 할 일:
 1. Plaud MCP의 list_files로 최근 녹음 목록을 가져오세요.
