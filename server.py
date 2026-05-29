@@ -95,6 +95,22 @@ def resolve_codex_command():
     return shutil.which('codex.cmd') or shutil.which('codex') or 'codex'
 
 
+def resolve_npx_command():
+    """Resolve npx in the same environment used by dashboard worker CLIs."""
+    return shutil.which('npx.cmd') or shutil.which('npx') or 'npx'
+
+
+def plaud_mcp_config_json():
+    return json.dumps({
+        'mcpServers': {
+            'plaud': {
+                'command': resolve_npx_command(),
+                'args': ['-y', '@plaud-ai/mcp@latest'],
+            },
+        },
+    }, ensure_ascii=False)
+
+
 def read_json_file(fpath, fallback=None):
     try:
         return json.loads(pathlib.Path(fpath).read_text(encoding='utf-8'))
@@ -2472,7 +2488,13 @@ def run_claude_task(fpath):
         'This is a dashboard worker invocation. Do not run PLAUD recording intake unless the user task explicitly asks for PLAUD or recording processing.',
     ]
 
-    if not task_requests_plaud(task):
+    if task_requests_plaud(task):
+        args.extend([
+            '--mcp-config',
+            plaud_mcp_config_json(),
+            '--strict-mcp-config',
+        ])
+    else:
         args.extend([
             '--mcp-config',
             '{"mcpServers":{}}',
