@@ -115,6 +115,19 @@ body[data-page="video-edit"] { --accent:#3b82f6; --accent-rgb:59,130,246; --acce
   background: #272737;
 }
 
+/* Icon System */
+.ui-icon {
+  width: 1em;
+  height: 1em;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
 /* Sidebar Styling */
 .sidebar {
   width: 240px;
@@ -148,6 +161,17 @@ body[data-page="video-edit"] { --accent:#3b82f6; --accent-rgb:59,130,246; --acce
 .sidebar-logo h1 span {
   color: var(--green);
   text-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+}
+.sidebar-logo-mark {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.sidebar-logo-mark .ui-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .sidebar-logo p {
@@ -204,10 +228,19 @@ body[data-page="video-edit"] { --accent:#3b82f6; --accent-rgb:59,130,246; --acce
 }
 
 .nav-item .ic {
-  font-size: 15px;
   width: 20px;
-  text-align: center;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
   transition: var(--transition);
+  flex-shrink: 0;
+}
+
+.nav-item .ic .ui-icon {
+  width: 16px;
+  height: 16px;
 }
 
 .nav-item.active .ic {
@@ -453,8 +486,17 @@ body[data-page="video-edit"] { --accent:#3b82f6; --accent-rgb:59,130,246; --acce
 }
 
 .cmd-icon {
-  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text-muted);
+  flex-shrink: 0;
+}
+.cmd-icon .ui-icon {
+  width: 17px;
+  height: 17px;
 }
 
 .cmd-input {
@@ -1167,15 +1209,22 @@ body[data-page="video-edit"] { --accent:#3b82f6; --accent-rgb:59,130,246; --acce
 .agent-detail-icon {
   width: 34px;
   height: 34px;
-  border-radius: var(--radius-md);
+  border-radius: 9px;
   border: 1px solid color-mix(in srgb, var(--agent-color, var(--green)) 42%, transparent);
-  background: color-mix(in srgb, var(--agent-color, var(--green)) 10%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.010)),
+    color-mix(in srgb, var(--agent-color, var(--green)) 10%, transparent);
   color: var(--agent-color, var(--green));
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 900;
   flex-shrink: 0;
+}
+.agent-roster-icon .ui-icon,
+.agent-detail-icon .ui-icon {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.9;
 }
 .agent-roster-name {
   color: var(--text-white);
@@ -1364,6 +1413,14 @@ body[data-page="video-edit"] { --accent:#3b82f6; --accent-rgb:59,130,246; --acce
   justify-content: space-between;
   gap: 10px;
 }
+.agent-lane-row {
+  display: grid;
+  grid-template-columns: 34px minmax(96px, 1fr) 86px;
+  align-items: center;
+  gap: 10px;
+  min-height: 72px;
+  padding: 12px 14px;
+}
 .agent-scope-path {
   font-family: var(--font-mono);
   overflow: hidden;
@@ -1410,31 +1467,79 @@ body[data-page="video-edit"] { --accent:#3b82f6; --accent-rgb:59,130,246; --acce
   min-width: 0;
 }
 .agent-lane-name strong {
+  display: block;
   color: var(--text-white);
   font-size: 12px;
+}
+.agent-lane-title-icon {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  align-self: center;
+  color: var(--agent-color, var(--green));
+  border: 1px solid color-mix(in srgb, var(--agent-color, var(--green)) 32%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.040), rgba(255,255,255,0.010)),
+    color-mix(in srgb, var(--agent-color, var(--green)) 8%, transparent);
+  flex-shrink: 0;
+}
+.agent-lane-title-icon .ui-icon {
+  width: 17px;
+  height: 17px;
 }
 .agent-lane-name span {
   display: block;
   color: #718198;
-  font-size: 10.5px;
+  font-size: 10px;
   margin-top: 3px;
+  white-space: nowrap;
 }
 .agent-lane-load {
-  width: 76px;
+  width: 86px;
   height: 5px;
   border-radius: 999px;
   background: rgba(255,255,255,0.045);
   overflow: hidden;
   flex-shrink: 0;
+  justify-self: end;
 }
 .agent-lane-load > div {
   height: 100%;
   width: var(--load, 0%);
   background: var(--agent-color, var(--green));
 }
+.task-agent-compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+.task-agent-compact .ui-icon {
+  width: 12px;
+  height: 12px;
+  color: var(--agent-color, var(--accent));
+}
+.inline-action-icon {
+  width: 15px;
+  height: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.inline-action-icon .ui-icon {
+  width: 15px;
+  height: 15px;
+}
 @media (max-width: 1400px) {
   .agent-workbench {
     grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  }
+  .agent-detail-body {
+    grid-template-columns: 1fr;
   }
   .agent-ops-panel {
     display: none;
@@ -2797,6 +2902,793 @@ body[data-page="video-edit"] { --accent:#3b82f6; --accent-rgb:59,130,246; --acce
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ===== HOME PAGE: CONTROL ROOM ===== */
+body[data-page="home"] .content {
+  padding: 24px 32px 24px;
+}
+#page-home.active {
+  min-height: calc(100vh - 120px);
+}
+.control-home {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(330px, 380px);
+  grid-template-areas:
+    "hero hero"
+    "focus brief"
+    "lanes brief"
+    "agents agents";
+  gap: 12px;
+}
+.control-hero,
+.control-focus,
+.control-lanes,
+.control-briefing,
+.control-agents,
+.control-feed {
+  border: 1px solid rgba(148,163,184,0.16);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.034), rgba(255,255,255,0.012)),
+    rgba(10,12,18,0.92);
+  box-shadow: none;
+}
+.control-hero {
+  grid-area: hero;
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto;
+  gap: 18px;
+  align-items: end;
+  padding: 14px 18px;
+  border-color: rgba(var(--accent-rgb),0.24);
+  background:
+    linear-gradient(90deg, rgba(var(--accent-rgb),0.13), rgba(59,130,246,0.06) 42%, rgba(255,255,255,0.014)),
+    rgba(9,12,17,0.96);
+}
+.control-kicker {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.control-hero h2 {
+  color: var(--text-white);
+  font-size: 34px;
+  line-height: 1.04;
+  font-weight: 900;
+  letter-spacing: 0;
+  margin-top: 6px;
+}
+.control-summary {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-top: 8px;
+}
+.control-date {
+  width: fit-content;
+  padding: 5px 10px;
+  border: 1px solid rgba(148,163,184,0.18);
+  border-radius: 999px;
+  background: rgba(0,0,0,0.24);
+  color: #cbd5e1;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.control-status-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(86px, 1fr));
+  border: 1px solid rgba(148,163,184,0.14);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.control-status-cell {
+  min-width: 0;
+  padding: 10px 14px;
+  border-right: 1px solid rgba(148,163,184,0.12);
+  background: rgba(255,255,255,0.016);
+}
+.control-status-cell:last-child {
+  border-right: 0;
+}
+.control-status-cell span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 850;
+}
+.control-status-cell b {
+  display: block;
+  color: var(--text-white);
+  font-family: var(--font-mono);
+  font-size: 24px;
+  line-height: 1;
+  margin-top: 7px;
+}
+.control-focus {
+  grid-area: focus;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 230px;
+  gap: 14px;
+  padding: 16px;
+}
+.control-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.control-section-head strong {
+  display: block;
+  color: var(--text-white);
+  font-size: 18px;
+  line-height: 1.2;
+}
+.control-section-head span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  margin-top: 3px;
+}
+.control-focus-title {
+  color: var(--text-white);
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.18;
+  overflow-wrap: anywhere;
+}
+.control-focus-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 9px;
+}
+.control-focus-bar {
+  height: 8px;
+  border: 1px solid rgba(148,163,184,0.18);
+  border-radius: 999px;
+  background: rgba(0,0,0,0.28);
+  overflow: hidden;
+  margin-top: 18px;
+}
+.control-focus-bar > div {
+  width: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  transition: width .3s ease;
+}
+.control-focus-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+}
+.control-focus-pct {
+  color: var(--text-white);
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 900;
+}
+.control-radar {
+  min-height: 178px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(148,163,184,0.12);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at center, rgba(var(--accent-rgb),0.16) 0 2px, transparent 3px),
+    repeating-radial-gradient(circle at center, rgba(148,163,184,0.12) 0 1px, transparent 1px 34px),
+    linear-gradient(180deg, rgba(255,255,255,0.018), rgba(255,255,255,0.006));
+}
+.control-radar-core {
+  width: 128px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background:
+    conic-gradient(var(--accent) calc(var(--radar-progress, 0) * 1%), rgba(148,163,184,0.14) 0),
+    rgba(0,0,0,0.24);
+  position: relative;
+}
+.control-radar-core::after {
+  content: '';
+  position: absolute;
+  inset: 11px;
+  border-radius: 50%;
+  background: #0c1118;
+  border: 1px solid rgba(148,163,184,0.16);
+}
+.control-radar-core > div {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+.control-radar-core b {
+  display: block;
+  color: var(--text-white);
+  font-family: var(--font-mono);
+  font-size: 25px;
+}
+.control-radar-core span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+.control-lanes {
+  grid-area: lanes;
+  padding: 14px 16px;
+}
+.control-lane-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.control-lane {
+  min-height: 118px;
+  border: 1px solid rgba(148,163,184,0.14);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.014);
+  padding: 12px;
+}
+.control-lane-label {
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 850;
+}
+.control-lane-count {
+  color: var(--text-white);
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 900;
+  margin-top: 8px;
+}
+.control-lane-item {
+  margin-top: 10px;
+  color: var(--text-hover);
+  font-size: 12.5px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.control-lane-note {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-top: 5px;
+}
+.control-briefing {
+  grid-area: brief;
+  padding: 14px 16px;
+}
+.control-stack {
+  display: grid;
+  gap: 10px;
+}
+.control-brief-item,
+.control-feed-item,
+.control-agent-row {
+  border: 1px solid rgba(148,163,184,0.14);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.014);
+  padding: 10px 12px;
+}
+.control-brief-item {
+  border-left: 4px solid var(--yellow);
+  cursor: pointer;
+}
+.control-brief-item.high { border-left-color: var(--red); }
+.control-brief-item.low { border-left-color: var(--blue); }
+.control-brief-item strong,
+.control-feed-item strong {
+  display: block;
+  color: var(--text-hover);
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.control-brief-item span,
+.control-feed-item span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 11.2px;
+  margin-top: 6px;
+}
+.control-agents {
+  grid-area: agents;
+  padding: 14px 16px;
+}
+.control-agent-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.control-agent-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+.control-agent-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  background: rgba(var(--accent-rgb),0.10);
+}
+.control-agent-name {
+  color: var(--text-hover);
+  font-size: 12.5px;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+.control-agent-meta {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-top: 3px;
+}
+.control-agent-count {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.control-agent-bar {
+  height: 5px;
+  border-radius: 999px;
+  border: 1px solid rgba(148,163,184,0.16);
+  background: rgba(255,255,255,0.02);
+  overflow: hidden;
+  margin-top: 7px;
+}
+.control-agent-bar > div {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+}
+.control-feed {
+  grid-area: feed;
+  padding: 14px 16px;
+}
+@media (max-width: 1280px) {
+  .control-home {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "hero"
+      "focus"
+      "lanes"
+      "brief"
+      "agents";
+  }
+}
+@media (max-width: 880px) {
+  body[data-page="home"] {
+    display: block;
+    height: auto;
+    min-height: 100vh;
+    overflow: auto;
+  }
+  body[data-page="home"] .sidebar {
+    display: none;
+  }
+  body[data-page="home"] .main {
+    min-height: 100vh;
+  }
+  body[data-page="home"] .topbar {
+    padding: 0 18px;
+  }
+  body[data-page="home"] .kpis {
+    display: none;
+  }
+  body[data-page="home"] .content {
+    overflow: visible;
+  }
+  body[data-page="home"] .content {
+    padding: 18px;
+  }
+  .control-hero,
+  .control-focus {
+    grid-template-columns: 1fr;
+  }
+  .control-status-strip,
+  .control-lane-grid,
+  .control-agent-grid {
+    grid-template-columns: 1fr;
+  }
+  .control-status-cell {
+    border-right: 0;
+    border-bottom: 1px solid rgba(148,163,184,0.12);
+  }
+  .control-status-cell:last-child {
+    border-bottom: 0;
+  }
+  .control-hero h2 {
+    font-size: 32px;
+  }
+}
+
+/* ===== HOME PAGE: OPERATIONS MANIFEST ===== */
+body[data-page="home"] .content {
+  padding: 26px 34px 28px;
+}
+.manifest-home {
+  position: relative;
+  min-height: calc(100vh - 118px);
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 18px;
+  color: var(--text);
+}
+.manifest-home > * {
+  position: relative;
+  z-index: 1;
+}
+.manifest-home::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(var(--accent-rgb),0.07) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(148,163,184,0.045) 1px, transparent 1px);
+  background-size: 42px 42px;
+  opacity: .28;
+  mask-image: linear-gradient(180deg, rgba(0,0,0,.8), transparent 88%);
+}
+.manifest-header {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: end;
+  padding-bottom: 18px;
+  border-bottom: 2px solid rgba(var(--accent-rgb),0.46);
+}
+.manifest-kicker {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.manifest-header h2 {
+  color: var(--text-white);
+  font-size: 46px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: 0;
+  margin-top: 7px;
+}
+.manifest-summary {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-top: 8px;
+}
+.manifest-date {
+  border: 1px solid rgba(148,163,184,0.2);
+  color: #d4dde9;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 850;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.018);
+  white-space: nowrap;
+}
+.manifest-totals {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(82px, 1fr));
+  gap: 1px;
+  background: rgba(148,163,184,0.16);
+  border: 1px solid rgba(148,163,184,0.16);
+}
+.manifest-total {
+  background: rgba(9,11,16,0.94);
+  padding: 10px 12px;
+}
+.manifest-total span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 850;
+}
+.manifest-total b {
+  display: block;
+  color: var(--text-white);
+  font-family: var(--font-mono);
+  font-size: 25px;
+  line-height: 1;
+  margin-top: 7px;
+}
+.manifest-focus {
+  position: relative;
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr) 150px;
+  gap: 18px;
+  align-items: stretch;
+  padding: 18px 0;
+  border-bottom: 1px solid rgba(148,163,184,0.16);
+}
+.manifest-index {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+.manifest-focus-title {
+  color: var(--text-white);
+  font-size: 29px;
+  line-height: 1.12;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+.manifest-focus-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 8px;
+}
+.manifest-progress {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  margin-top: 14px;
+}
+.manifest-bar {
+  height: 7px;
+  border: 1px solid rgba(148,163,184,0.18);
+  background: rgba(255,255,255,0.02);
+  overflow: hidden;
+}
+.manifest-bar > div {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+}
+.manifest-pct {
+  color: var(--text-white);
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 900;
+}
+.manifest-open {
+  display: grid;
+  align-content: center;
+  justify-items: end;
+  border-left: 1px solid rgba(148,163,184,0.16);
+  padding-left: 18px;
+}
+.manifest-open b {
+  color: var(--text-white);
+  font-family: var(--font-mono);
+  font-size: 46px;
+  line-height: 1;
+}
+.manifest-open span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.manifest-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(310px, 370px);
+  gap: 22px;
+  min-height: 0;
+}
+.manifest-section-title {
+  color: var(--text-white);
+  font-size: 17px;
+  font-weight: 900;
+  margin-bottom: 10px;
+}
+.manifest-table {
+  border-top: 1px solid rgba(148,163,184,0.2);
+}
+.manifest-table-head,
+.manifest-line {
+  display: grid;
+  grid-template-columns: 90px 76px minmax(0, 1fr) 160px;
+  gap: 14px;
+  align-items: center;
+}
+.manifest-table-head {
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(148,163,184,0.14);
+}
+.manifest-line {
+  min-height: 78px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(148,163,184,0.14);
+}
+.manifest-line-label {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 900;
+}
+.manifest-line-count {
+  color: var(--text-white);
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 900;
+}
+.manifest-line-title {
+  color: var(--text-hover);
+  font-size: 14px;
+  font-weight: 850;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.manifest-line-note,
+.manifest-alert span,
+.manifest-agent-meta {
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+.manifest-side {
+  border-left: 1px solid rgba(148,163,184,0.16);
+  padding-left: 20px;
+}
+.manifest-alert {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid rgba(148,163,184,0.13);
+  cursor: pointer;
+}
+.manifest-alert::before {
+  content: '';
+  width: 4px;
+  height: 100%;
+  min-height: 42px;
+  background: var(--yellow);
+}
+.manifest-alert.high::before { background: var(--red); }
+.manifest-alert.low::before { background: var(--blue); }
+.manifest-alert strong {
+  display: block;
+  color: var(--text-hover);
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.manifest-alert span {
+  display: block;
+  margin-top: 5px;
+}
+.manifest-agents {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+  padding-top: 14px;
+  border-top: 1px solid rgba(148,163,184,0.16);
+}
+.manifest-agent-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.manifest-agent {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+.manifest-agent-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  border: 1px solid rgba(var(--accent-rgb),0.24);
+  background: rgba(var(--accent-rgb),0.08);
+}
+.manifest-agent-icon .ui-icon {
+  width: 15px;
+  height: 15px;
+  stroke-width: 1.9;
+}
+.manifest-agent-name {
+  color: var(--text-hover);
+  font-size: 12.5px;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+.manifest-agent-count {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.manifest-agent-bar {
+  height: 4px;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid rgba(148,163,184,0.14);
+  margin-top: 6px;
+  overflow: hidden;
+}
+.manifest-agent-bar > div {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+}
+@media (max-width: 1180px) {
+  .manifest-body {
+    grid-template-columns: 1fr;
+  }
+  .manifest-side {
+    border-left: 0;
+    padding-left: 0;
+  }
+}
+@media (max-width: 880px) {
+  body[data-page="home"] {
+    display: block;
+    height: auto;
+    min-height: 100vh;
+    overflow: auto;
+  }
+  body[data-page="home"] .sidebar,
+  body[data-page="home"] .kpis {
+    display: none;
+  }
+  body[data-page="home"] .main {
+    min-height: 100vh;
+  }
+  body[data-page="home"] .topbar {
+    padding: 0 18px;
+  }
+  body[data-page="home"] .content {
+    padding: 18px;
+    overflow: visible;
+  }
+  .manifest-header,
+  .manifest-focus,
+  .manifest-agents {
+    grid-template-columns: 1fr;
+  }
+  .manifest-totals {
+    grid-template-columns: 1fr;
+  }
+  .manifest-focus {
+    gap: 12px;
+  }
+  .manifest-open {
+    justify-items: start;
+    border-left: 0;
+    border-top: 1px solid rgba(148,163,184,0.16);
+    padding: 12px 0 0;
+  }
+  .manifest-table-head {
+    display: none;
+  }
+  .manifest-line {
+    grid-template-columns: 64px 54px 1fr;
+  }
+  .manifest-line-note {
+    grid-column: 3;
+  }
+  .manifest-agent-strip {
+    grid-template-columns: 1fr;
+  }
+  .manifest-header h2 {
+    font-size: 36px;
+  }
 }
 
 /* ===== CALENDAR PAGE ===== */
@@ -5550,39 +6442,744 @@ body {
   font-size: 12px;
   line-height: 1.55;
 }
+
+/* ===== CROSS PAGE: OPERATIONS MANIFEST SYSTEM ===== */
+body:not([data-page="home"]) .content {
+  padding: 26px 34px 28px;
+}
+.page:not(#page-home).active {
+  position: relative;
+}
+.page:not(#page-home).active::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(148,163,184,0.032) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(148,163,184,0.026) 1px, transparent 1px);
+  background-size: 42px 42px;
+  opacity: .18;
+  mask-image: linear-gradient(180deg, rgba(0,0,0,.82), transparent 86%);
+}
+.page:not(#page-home).active > * {
+  position: relative;
+  z-index: 1;
+}
+body:not([data-page="home"]) .page-head,
+body:not([data-page="home"]) .project-head,
+body:not([data-page="home"]) .task-os-head,
+body:not([data-page="home"]) #page-video > div:first-child {
+  border-bottom: 1px solid rgba(148,163,184,0.22) !important;
+  padding: 0 0 18px !important;
+  margin-bottom: 18px !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+}
+body:not([data-page="home"]) .page-head::after,
+body:not([data-page="home"]) .project-head::after,
+body:not([data-page="home"]) .task-os-head::after {
+  display: none !important;
+}
+body:not([data-page="home"]) .page-h1,
+body:not([data-page="home"]) .project-head h2,
+body:not([data-page="home"]) .task-os-head h2,
+body:not([data-page="home"]) #page-video > div:first-child h2 {
+  color: var(--text-white) !important;
+  font-size: 40px !important;
+  line-height: 1 !important;
+  font-weight: 900 !important;
+  letter-spacing: 0 !important;
+}
+body:not([data-page="home"]) .page-sub,
+body:not([data-page="home"]) .project-head p,
+body:not([data-page="home"]) .task-os-head p,
+body:not([data-page="home"]) #page-video > div:first-child p {
+  color: var(--text-muted) !important;
+  font-size: 13px !important;
+  line-height: 1.45 !important;
+  margin-top: 8px !important;
+}
+body:not([data-page="home"]) .btn,
+body:not([data-page="home"]) .muted-btn,
+body:not([data-page="home"]) .nav-item,
+body:not([data-page="home"]) .project-tab,
+body:not([data-page="home"]) .task-os-tab,
+body:not([data-page="home"]) .task-filter-chip,
+body:not([data-page="home"]) .request-task-pill,
+body:not([data-page="home"]) .meeting-tab,
+body:not([data-page="home"]) .review-filter-chip,
+body:not([data-page="home"]) .composer-agent-btn {
+  border-radius: 2px !important;
+}
+body:not([data-page="home"]) .muted-btn,
+body:not([data-page="home"]) .project-tab,
+body:not([data-page="home"]) .task-os-tab,
+body:not([data-page="home"]) .task-filter-chip,
+body:not([data-page="home"]) .request-task-pill,
+body:not([data-page="home"]) .meeting-tab,
+body:not([data-page="home"]) .review-filter-chip,
+body:not([data-page="home"]) .composer-agent-btn,
+body:not([data-page="home"]) .nav-item {
+  background: rgba(255,255,255,0.012) !important;
+  border-color: rgba(148,163,184,0.17) !important;
+}
+body:not([data-page="home"]) .project-tab.active,
+body:not([data-page="home"]) .task-os-tab.active,
+body:not([data-page="home"]) .task-filter-chip.active,
+body:not([data-page="home"]) .request-task-pill.active,
+body:not([data-page="home"]) .meeting-tab.active,
+body:not([data-page="home"]) .review-filter-chip.active,
+body:not([data-page="home"]) .nav-item.active {
+  color: var(--accent) !important;
+  background: rgba(var(--accent-rgb),0.035) !important;
+  border-color: rgba(var(--accent-rgb),0.22) !important;
+  box-shadow: none !important;
+}
+body:not([data-page="home"]) .card,
+body:not([data-page="home"]) .guide-hero,
+body:not([data-page="home"]) .guide-section,
+body:not([data-page="home"]) .guide-routine,
+body:not([data-page="home"]) .guide-quick-card,
+body:not([data-page="home"]) .guide-flow-card,
+body:not([data-page="home"]) .guide-skill-card,
+body:not([data-page="home"]) .guide-rule-card,
+body:not([data-page="home"]) .project-owner-strip,
+body:not([data-page="home"]) .project-owner-chip,
+body:not([data-page="home"]) .project-decision-panel,
+body:not([data-page="home"]) .project-board,
+body:not([data-page="home"]) .project-card,
+body:not([data-page="home"]) .agent-command-bar,
+body:not([data-page="home"]) .agent-summary-tile,
+body:not([data-page="home"]) .agent-roster-panel,
+body:not([data-page="home"]) .agent-detail-panel,
+body:not([data-page="home"]) .agent-ops-panel,
+body:not([data-page="home"]) .agent-roster-card,
+body:not([data-page="home"]) .agent-detail-section,
+body:not([data-page="home"]) .agent-ops-section,
+body:not([data-page="home"]) .agent-task-row,
+body:not([data-page="home"]) .agent-scope-row,
+body:not([data-page="home"]) .agent-skill-control,
+body:not([data-page="home"]) .agent-history-row,
+body:not([data-page="home"]) .agent-lane-row,
+body:not([data-page="home"]) .request-thread-pane,
+body:not([data-page="home"]) .request-chat-panel,
+body:not([data-page="home"]) .request-thread-group,
+body:not([data-page="home"]) .request-thread-task,
+body:not([data-page="home"]) .request-status-card,
+body:not([data-page="home"]) .request-status-cell,
+body:not([data-page="home"]) .request-draft-plan,
+body:not([data-page="home"]) .request-plan-item,
+body:not([data-page="home"]) .request-plan-summary,
+body:not([data-page="home"]) .request-composer-box,
+body:not([data-page="home"]) .task-summary-card,
+body:not([data-page="home"]) .task-request-rail,
+body:not([data-page="home"]) .task-subtask-panel,
+body:not([data-page="home"]) .task-detail-panel,
+body:not([data-page="home"]) .task-request-card,
+body:not([data-page="home"]) .t-item,
+body:not([data-page="home"]) .calendar-board,
+body:not([data-page="home"]) .calendar-panel,
+body:not([data-page="home"]) .calendar-chat-panel,
+body:not([data-page="home"]) .calendar-day,
+body:not([data-page="home"]) .calendar-side-event,
+body:not([data-page="home"]) .calendar-chat-bubble,
+body:not([data-page="home"]) .calendar-draft-card,
+body:not([data-page="home"]) .metric-card,
+body:not([data-page="home"]) .meeting-row,
+body:not([data-page="home"]) .meeting-task-row,
+body:not([data-page="home"]) .meeting-note-box,
+body:not([data-page="home"]) .meeting-detail-shell,
+body:not([data-page="home"]) .review-thread-rail,
+body:not([data-page="home"]) .review-chat-panel,
+body:not([data-page="home"]) .review-thread-item,
+body:not([data-page="home"]) .review-chat-brief-item,
+body:not([data-page="home"]) .review-chat-bubble,
+body:not([data-page="home"]) .review-composer-box,
+body:not([data-page="home"]) .video-transcript-review-card,
+body:not([data-page="home"]) .video-final-transcript-panel,
+body:not([data-page="home"]) .video-transcript-review-side,
+body:not([data-page="home"]) .video-transcript-review-message {
+  border-radius: 0 !important;
+  background: rgba(9,11,16,0.74) !important;
+  border-color: rgba(148,163,184,0.16) !important;
+  box-shadow: none !important;
+}
+body:not([data-page="home"]) .card-title,
+body:not([data-page="home"]) .guide-eyebrow,
+body:not([data-page="home"]) .guide-flow-num,
+body:not([data-page="home"]) .project-breadcrumb,
+body:not([data-page="home"]) .project-rule-num,
+body:not([data-page="home"]) .agent-panel-meta,
+body:not([data-page="home"]) .task-panel-sub,
+body:not([data-page="home"]) .calendar-sub,
+body:not([data-page="home"]) .review-thread-sub {
+  color: var(--accent) !important;
+  font-family: var(--font-mono);
+  letter-spacing: .08em;
+}
+body:not([data-page="home"]) .agent-roster-card,
+body:not([data-page="home"]) .project-card,
+body:not([data-page="home"]) .task-request-card,
+body:not([data-page="home"]) .request-thread-group,
+body:not([data-page="home"]) .meeting-row,
+body:not([data-page="home"]) .review-thread-item,
+body:not([data-page="home"]) .cov-slot-row {
+  border-left: 3px solid rgba(var(--accent-rgb),0.30) !important;
+}
+body:not([data-page="home"]) .project-card:hover,
+body:not([data-page="home"]) .agent-roster-card:hover,
+body:not([data-page="home"]) .task-request-card:hover,
+body:not([data-page="home"]) .request-thread-group:hover,
+body:not([data-page="home"]) .meeting-row:hover,
+body:not([data-page="home"]) .review-thread-item:hover,
+body:not([data-page="home"]) .cov-slot-row:hover {
+  transform: none !important;
+  background: rgba(var(--accent-rgb),0.024) !important;
+  border-color: rgba(var(--accent-rgb),0.20) !important;
+}
+body:not([data-page="home"]) .metric-strip,
+body:not([data-page="home"]) .task-summary-strip,
+body:not([data-page="home"]) #cov-kpis-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 1px !important;
+  background: rgba(148,163,184,0.16);
+  border: 1px solid rgba(148,163,184,0.16);
+  margin-bottom: 18px !important;
+}
+body:not([data-page="home"]) .metric-card,
+body:not([data-page="home"]) .task-summary-card,
+body:not([data-page="home"]) #cov-kpis-grid > .card {
+  border: 0 !important;
+  background: rgba(9,11,16,0.94) !important;
+  padding: 12px 14px !important;
+  min-width: 0 !important;
+}
+body:not([data-page="home"]) .metric-card .value,
+body:not([data-page="home"]) .task-summary-card .value,
+body:not([data-page="home"]) #cov-kpi-pct {
+  font-size: 26px !important;
+  line-height: 1 !important;
+}
+body:not([data-page="home"]) input,
+body:not([data-page="home"]) textarea,
+body:not([data-page="home"]) select {
+  border-radius: 0 !important;
+}
+body:not([data-page="home"]) .guide-hero,
+body:not([data-page="home"]) .project-owner-strip,
+body:not([data-page="home"]) .agent-command-bar,
+body:not([data-page="home"]) .calendar-toolbar,
+body:not([data-page="home"]) .meeting-detail-top,
+body:not([data-page="home"]) .review-chat-head,
+body:not([data-page="home"]) .video-transcript-review-head {
+  border-bottom: 1px solid rgba(148,163,184,0.18) !important;
+}
+body:not([data-page="home"]) .calendar-grid,
+body:not([data-page="home"]) .project-grid,
+body:not([data-page="home"]) .task-request-list,
+body:not([data-page="home"]) .task-items-scroll,
+body:not([data-page="home"]) .request-thread-list,
+body:not([data-page="home"]) .review-thread-list,
+body:not([data-page="home"]) #meeting-list,
+body:not([data-page="home"]) #cov-tree-container {
+  scrollbar-color: rgba(var(--accent-rgb),0.38) transparent;
+}
+body:not([data-page="home"]) .calendar-day.today,
+body:not([data-page="home"]) .calendar-day.selected,
+body:not([data-page="home"]) .request-thread-group.active,
+body:not([data-page="home"]) .task-request-card.active,
+body:not([data-page="home"]) .agent-roster-card.active,
+body:not([data-page="home"]) .meeting-row.sel,
+body:not([data-page="home"]) .review-thread-item.active,
+body:not([data-page="home"]) .cov-slot-sel {
+  background: rgba(var(--accent-rgb),0.038) !important;
+  box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb),0.16) !important;
+}
+#page-guide .guide-hero h2 {
+  font-size: 36px !important;
+  line-height: 1.08 !important;
+}
+#page-guide .guide-section {
+  padding: 16px 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+}
+#page-projects .project-main-row,
+#page-tasks .task-workspace,
+#page-calendar .calendar-shell,
+#page-meetings .meetings-layout,
+#page-review .review-chat-workspace {
+  gap: 18px !important;
+}
+#page-projects .project-grid,
+#page-tasks .task-request-list,
+#page-tasks .task-items-scroll {
+  padding: 12px 0 !important;
+}
+#page-request .request-chat-shell {
+  border-top: 1px solid rgba(148,163,184,0.16);
+  padding-top: 14px;
+}
+#page-coverage > div[style*="height: calc"] {
+  border-top: 1px solid rgba(148,163,184,0.16);
+  padding-top: 14px;
+}
+#page-log #log-timeline-container > div:first-child {
+  background: rgba(var(--accent-rgb),0.18) !important;
+}
+#page-video .g2 {
+  gap: 18px !important;
+}
+
+/* ===== COLOR RESTRAINT PASS ===== */
+body:not([data-page="home"]) .agent-detail-header,
+body:not([data-page="home"]) .calendar-toolbar,
+body:not([data-page="home"]) .video-transcript-review-head,
+body:not([data-page="home"]) .review-hero-card,
+body:not([data-page="home"]) .review-status-panel,
+body:not([data-page="home"]) .review-quick-card,
+body:not([data-page="home"]) .meeting-command-card {
+  background: rgba(9,11,16,0.78) !important;
+}
+body:not([data-page="home"]) .card-title,
+body:not([data-page="home"]) .guide-eyebrow,
+body:not([data-page="home"]) .guide-flow-num,
+body:not([data-page="home"]) .project-breadcrumb,
+body:not([data-page="home"]) .project-rule-num,
+body:not([data-page="home"]) .agent-panel-meta,
+body:not([data-page="home"]) .task-panel-sub,
+body:not([data-page="home"]) .calendar-sub,
+body:not([data-page="home"]) .review-thread-sub {
+  color: #9aa6b7 !important;
+}
+body:not([data-page="home"]) .project-rule-num,
+body:not([data-page="home"]) .agent-roster-icon,
+body:not([data-page="home"]) .agent-detail-icon,
+body:not([data-page="home"]) .manifest-agent-icon {
+  background: rgba(var(--accent-rgb),0.045) !important;
+  border-color: rgba(var(--accent-rgb),0.18) !important;
+}
+body:not([data-page="home"]) .project-badge,
+body:not([data-page="home"]) .agent-access-pill.rw,
+body:not([data-page="home"]) .agent-state-pill.active,
+body:not([data-page="home"]) .request-task-pill.active,
+body:not([data-page="home"]) .video-transcript-review-chip {
+  background: rgba(var(--accent-rgb),0.045) !important;
+  border-color: rgba(var(--accent-rgb),0.18) !important;
+}
+body:not([data-page="home"]) .request-message.user .bubble,
+body:not([data-page="home"]) .calendar-chat-message.user .calendar-chat-bubble,
+body:not([data-page="home"]) .review-chat-message.from-user .review-chat-bubble,
+body:not([data-page="home"]) .video-transcript-review-message.user {
+  background: rgba(255,255,255,0.045) !important;
+  border-color: rgba(148,163,184,0.16) !important;
+}
+body:not([data-page="home"]) .calendar-day.today,
+body:not([data-page="home"]) .calendar-day.selected {
+  background: rgba(var(--accent-rgb),0.028) !important;
+}
+body:not([data-page="home"]) .btn:not(.muted-btn),
+body:not([data-page="home"]) .request-new-btn,
+body:not([data-page="home"]) .request-send-btn,
+body:not([data-page="home"]) .video-transcript-review-send {
+  box-shadow: none !important;
+}
+
+/* ===== SELECTION CLARITY + TASK RAIL FIX ===== */
+body:not([data-page="home"]) .project-tab.active,
+body:not([data-page="home"]) .task-os-tab.active,
+body:not([data-page="home"]) .task-filter-chip.active,
+body:not([data-page="home"]) .request-task-pill.active,
+body:not([data-page="home"]) .meeting-tab.active,
+body:not([data-page="home"]) .review-filter-chip.active,
+body:not([data-page="home"]) .nav-item.active {
+  color: var(--text-white) !important;
+  background: rgba(var(--accent-rgb),0.075) !important;
+  border-color: rgba(var(--accent-rgb),0.38) !important;
+  box-shadow: inset 0 -2px 0 rgba(var(--accent-rgb),0.72) !important;
+}
+body:not([data-page="home"]) .request-thread-group.active,
+body:not([data-page="home"]) .request-thread-task.active,
+body:not([data-page="home"]) .task-request-card.active,
+body:not([data-page="home"]) .t-item.sel,
+body:not([data-page="home"]) .agent-roster-card.active,
+body:not([data-page="home"]) .meeting-row.sel,
+body:not([data-page="home"]) .review-thread-item.active,
+body:not([data-page="home"]) .cov-slot-sel {
+  background: rgba(var(--accent-rgb),0.070) !important;
+  border-color: rgba(var(--accent-rgb),0.42) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--accent-rgb),0.22),
+    inset 4px 0 0 rgba(var(--accent-rgb),0.85) !important;
+}
+body:not([data-page="home"]) .task-request-card.active::before,
+body:not([data-page="home"]) .agent-roster-card.active::before {
+  width: 4px !important;
+  opacity: 1 !important;
+}
+body:not([data-page="home"]) .calendar-day.selected {
+  background: rgba(var(--accent-rgb),0.070) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--accent-rgb),0.34),
+    inset 0 3px 0 rgba(var(--accent-rgb),0.82) !important;
+}
+#page-tasks .task-request-board {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  margin-bottom: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+#page-tasks .task-request-list {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  overflow-y: auto !important;
+  padding: 12px 10px 18px !important;
+}
+#page-tasks .task-request-card {
+  box-sizing: border-box !important;
+  min-height: 104px !important;
+  overflow: visible !important;
+  padding: 14px 14px 13px 16px !important;
+  display: grid !important;
+  grid-template-rows: auto auto auto !important;
+  align-content: center !important;
+  row-gap: 8px !important;
+}
+#page-tasks .task-request-title {
+  min-height: 0 !important;
+  line-height: 1.38 !important;
+}
+#page-tasks .task-request-progress {
+  flex-shrink: 0 !important;
+  margin-top: 0 !important;
+}
+#page-tasks .task-request-meta {
+  flex-shrink: 0 !important;
+  margin-top: 0 !important;
+  line-height: 1.35 !important;
+  overflow: visible !important;
+}
+#page-tasks .task-request-meta span {
+  min-width: 0;
+}
+
+/* ===== REVIEW CHAT ALIGNMENT FIX ===== */
+#page-review .review-chat-body {
+  background: rgba(7,9,13,0.58) !important;
+  background-image: none !important;
+}
+#page-review .review-chat-message {
+  max-width: min(760px, 78%) !important;
+}
+#page-review .review-chat-message.from-user {
+  align-self: flex-end !important;
+  align-items: flex-end !important;
+}
+#page-review .review-chat-message.from-agent,
+#page-review .review-chat-message.system,
+#page-review .review-chat-message.cli-output {
+  align-self: flex-start !important;
+  align-items: flex-start !important;
+}
+#page-review .review-chat-message.system {
+  max-width: min(760px, 78%) !important;
+}
+#page-review .review-chat-message.from-user .review-chat-meta-line {
+  text-align: right;
+}
+#page-review .review-chat-message.from-agent .review-chat-meta-line,
+#page-review .review-chat-message.system .review-chat-meta-line,
+#page-review .review-chat-message.cli-output .review-chat-meta-line {
+  text-align: left;
+}
+#page-review .review-chat-message.system .review-chat-bubble {
+  background: rgba(12,15,22,0.82) !important;
+  border-color: rgba(148,163,184,0.16) !important;
+  color: #d6dfec !important;
+}
+#page-review .review-chat-message.from-user .review-chat-bubble {
+  border-top-right-radius: 0 !important;
+}
+#page-review .review-chat-message.from-agent .review-chat-bubble,
+#page-review .review-chat-message.system .review-chat-bubble,
+#page-review .review-chat-message.cli-output .review-chat-bubble {
+  border-top-left-radius: 0 !important;
+}
+
+/* ===== PROJECT BOARD FIT FIX ===== */
+#page-projects.active {
+  height: auto !important;
+  min-height: calc(100vh - 112px) !important;
+  overflow: visible !important;
+}
+#page-projects .project-page,
+#page-projects .project-main-row,
+#page-projects .project-board {
+  min-height: 0 !important;
+}
+#page-projects .project-board {
+  overflow: visible !important;
+}
+#page-projects .project-board-top {
+  padding: 10px 14px !important;
+}
+#page-projects .project-board-top .project-decision-sub {
+  line-height: 1.35 !important;
+  margin-top: 3px !important;
+}
+#page-projects .project-grid {
+  gap: 10px !important;
+  align-items: start !important;
+  grid-auto-rows: minmax(146px, auto) !important;
+  overflow: visible !important;
+  padding: 10px 10px 18px !important;
+}
+#page-projects .project-card {
+  min-height: 146px !important;
+  padding: 12px !important;
+  gap: 7px !important;
+}
+#page-projects .project-title {
+  font-size: 13.5px !important;
+  line-height: 1.3 !important;
+}
+#page-projects .project-client {
+  margin-top: 3px !important;
+}
+#page-projects .project-card > div[style*="min-height:34px"] {
+  min-height: 0 !important;
+  font-size: 11px !important;
+  line-height: 1.35 !important;
+}
+#page-projects .project-progress-row {
+  gap: 8px !important;
+}
+#page-projects .project-card-meta {
+  min-width: 0 !important;
+  font-size: 10.8px !important;
+  line-height: 1.28 !important;
+}
+#page-projects .project-card-meta span {
+  min-width: 0;
+}
+#page-projects .project-owner-line {
+  overflow: hidden;
+}
+#page-projects .project-owner-line + span {
+  white-space: nowrap;
+}
+@media (min-width: 1680px) {
+  #page-projects .project-grid {
+    grid-template-columns: repeat(4, minmax(220px, 1fr)) !important;
+  }
+}
+@media (max-width: 1180px) {
+  body:not([data-page="home"]) .page-head,
+  body:not([data-page="home"]) .project-head,
+  body:not([data-page="home"]) .task-os-head,
+  body:not([data-page="home"]) #page-video > div:first-child {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+  }
+  body:not([data-page="home"]) .metric-strip,
+  body:not([data-page="home"]) .task-summary-strip,
+  body:not([data-page="home"]) #cov-kpis-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+@media (max-width: 760px) {
+  body:not([data-page="home"]) {
+    display: block;
+    height: auto;
+    min-height: 100vh;
+    overflow: auto;
+  }
+  body:not([data-page="home"]) .sidebar,
+  body:not([data-page="home"]) .kpis {
+    display: none;
+  }
+  body:not([data-page="home"]) .main {
+    min-height: 100vh;
+  }
+  body:not([data-page="home"]) .content {
+    padding: 18px;
+    overflow: visible;
+  }
+  body:not([data-page="home"]) .page-head,
+  body:not([data-page="home"]) .project-head,
+  body:not([data-page="home"]) .task-os-head,
+  body:not([data-page="home"]) #page-video > div:first-child {
+    gap: 12px !important;
+  }
+  body:not([data-page="home"]) .page-h1,
+  body:not([data-page="home"]) .project-head h2,
+  body:not([data-page="home"]) .task-os-head h2,
+  body:not([data-page="home"]) #page-video > div:first-child h2 {
+    font-size: 32px !important;
+  }
+  body:not([data-page="home"]) .metric-strip,
+  body:not([data-page="home"]) .task-summary-strip,
+  body:not([data-page="home"]) #cov-kpis-grid {
+    grid-template-columns: 1fr !important;
+  }
+  body:not([data-page="home"]) .page.active {
+    height: auto !important;
+    min-height: calc(100vh - 36px) !important;
+    overflow: visible !important;
+  }
+  #page-projects .project-page,
+  #page-projects .project-head,
+  #page-projects .project-head > div,
+  #page-projects .project-board,
+  #page-request .request-chat-shell,
+  #page-calendar .calendar-shell,
+  #page-calendar .calendar-board,
+  #page-video .card,
+  #page-video .g2 {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+  #page-projects .project-head {
+    overflow: hidden !important;
+  }
+  #page-projects .project-tabs,
+  #page-projects .project-status-tabs {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    scrollbar-width: none;
+  }
+  #page-projects .project-owner-strip {
+    padding: 10px 0 !important;
+    border-left: 0 !important;
+    border-right: 0 !important;
+  }
+  #page-projects .project-main-row,
+  #page-request .request-chat-shell,
+  #page-calendar .calendar-shell {
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: visible !important;
+  }
+  #page-projects .project-decision-panel,
+  #page-projects .project-board {
+    overflow: visible !important;
+  }
+  #page-projects .project-board-top {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+  }
+  #page-projects .project-board-top > div:last-child {
+    width: 100% !important;
+    align-items: flex-start !important;
+    flex-wrap: wrap !important;
+  }
+  #page-projects .project-status-tabs {
+    flex: 1 1 220px !important;
+  }
+  #page-request .request-thread-pane {
+    max-height: 560px !important;
+  }
+  #page-request .request-chat-panel {
+    min-height: 680px !important;
+  }
+  #page-request .request-chat-header {
+    flex-direction: column !important;
+  }
+  #page-request .request-chat-messages {
+    padding: 14px !important;
+  }
+  #page-request .request-status-card {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  #page-calendar .calendar-board {
+    min-height: 520px !important;
+  }
+  #page-calendar .calendar-toolbar {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+  }
+  #page-calendar .calendar-weekdays div {
+    padding: 8px 0 !important;
+    text-align: center !important;
+    font-size: 9px !important;
+  }
+  #page-calendar .calendar-grid {
+    grid-auto-rows: 64px !important;
+  }
+  #page-calendar .calendar-day {
+    padding: 8px 4px !important;
+  }
+  #page-calendar .calendar-events {
+    display: none !important;
+  }
+  #page-calendar .calendar-chat-panel {
+    height: auto !important;
+    min-height: 300px !important;
+  }
+  #page-video .g2,
+  #page-video div[style*="grid-template-columns: minmax(0,1fr) auto auto auto auto"],
+  #page-video div[style*="grid-template-columns:minmax(220px"] {
+    grid-template-columns: 1fr !important;
+  }
+  #page-video div[style*="gap: 28px"] {
+    gap: 14px !important;
+  }
+  #page-video div[style*="align-items: center; gap: 12px"] {
+    align-items: flex-start !important;
+    flex-wrap: wrap !important;
+  }
+  #page-video label {
+    white-space: normal !important;
+  }
+  #page-video button,
+  #page-video select {
+    max-width: 100% !important;
+  }
+  #video-system-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
 </style>
 </head>
 <body>
 
 <aside class="sidebar">
   <div class="sidebar-logo">
-    <h1><span>⌬</span> CRATA</h1>
+    <h1><span class="sidebar-logo-mark" data-icon="hexagon"></span> CRATA</h1>
     <p>에이전트 제어 센터</p>
   </div>
   <div class="nav-section">
     <div class="nav-label">관제</div>
-    <div class="nav-item active" onclick="nav('home',this)"><span class="ic">⬡</span> 홈</div>
-    <div class="nav-item" onclick="nav('guide',this)"><span class="ic">?</span> 가이드</div>
+    <div class="nav-item active" onclick="nav('home',this)"><span class="ic" data-icon="home"></span> 홈</div>
+    <div class="nav-item" onclick="nav('guide',this)"><span class="ic" data-icon="help"></span> 가이드</div>
   </div>
   <div class="nav-section">
     <div class="nav-label">협업 에이전트</div>
-    <div class="nav-item" onclick="nav('agents',this)"><span class="ic">◈</span> 에이전트</div>
-    <div class="nav-item" onclick="nav('projects',this)"><span class="ic">▣</span> 프로젝트</div>
-    <div class="nav-item" onclick="nav('request',this)"><span class="ic">✉</span> 작업 요청</div>
-    <div class="nav-item" onclick="nav('tasks',this)"><span class="ic">◎</span> 작업 지시서</div>
-    <div class="nav-item" onclick="nav('calendar',this)"><span class="ic">▣</span> 캘린더</div>
-    <div class="nav-item" onclick="nav('meetings',this)"><span class="ic">◫</span> 회의록</div>
+    <div class="nav-item" onclick="nav('agents',this)"><span class="ic" data-icon="bot"></span> 에이전트</div>
+    <div class="nav-item" onclick="nav('projects',this)"><span class="ic" data-icon="kanban"></span> 프로젝트</div>
+    <div class="nav-item" onclick="nav('request',this)"><span class="ic" data-icon="send"></span> 작업 요청</div>
+    <div class="nav-item" onclick="nav('tasks',this)"><span class="ic" data-icon="clipboard-list"></span> 작업 지시서</div>
+    <div class="nav-item" onclick="nav('calendar',this)"><span class="ic" data-icon="calendar"></span> 캘린더</div>
+    <div class="nav-item" onclick="nav('meetings',this)"><span class="ic" data-icon="mic"></span> 회의록</div>
   </div>
   <div class="nav-section">
     <div class="nav-label">산출물 & 지식</div>
-    <div class="nav-item" onclick="nav('coverage',this)"><span class="ic">▦</span> 문구 커버리지</div>
-    <div class="nav-item" onclick="nav('log',this)"><span class="ic">≡</span> 수정 로그</div>
-    <div class="nav-item" onclick="try{renderReviews()}catch(e){};nav('review',this)"><span class="ic">◷</span> 검수 현황</div>
+    <div class="nav-item" onclick="nav('coverage',this)"><span class="ic" data-icon="grid"></span> 문구 커버리지</div>
+    <div class="nav-item" onclick="nav('log',this)"><span class="ic" data-icon="list-checks"></span> 수정 로그</div>
+    <div class="nav-item" onclick="try{renderReviews()}catch(e){};nav('review',this)"><span class="ic" data-icon="shield-check"></span> 검수 현황</div>
   </div>
   <div class="nav-section">
     <div class="nav-label">미디어 렌더링</div>
-    <div class="nav-item" onclick="nav('video',this)"><span class="ic">▶</span> 자동 자막 편집 <span id="nav-video-dot" style="margin-left:auto;width:6px;height:6px;border-radius:50%;background:var(--text-muted);flex-shrink:0;transition:var(--transition)"></span></div>
-    <div class="nav-item" onclick="nav('video-edit',this)"><span class="ic">✂</span> 영상 작업</div>
+    <div class="nav-item" onclick="nav('video',this)"><span class="ic" data-icon="captions"></span> 자동 자막 편집 <span id="nav-video-dot" style="margin-left:auto;width:6px;height:6px;border-radius:50%;background:var(--text-muted);flex-shrink:0;transition:var(--transition)"></span></div>
+    <div class="nav-item" onclick="nav('video-edit',this)"><span class="ic" data-icon="scissors"></span> 영상 작업</div>
   </div>
   
   <div style="margin-top:auto; padding: 12px; border-radius: var(--radius-md); background: rgba(255,255,255,0.01); border: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
@@ -5611,136 +7208,65 @@ body {
 
     <!-- ── 1. HOME PAGE ── -->
     <div class="page active" id="page-home">
-      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:12px;flex-shrink:0;">
-        <div>
-          <h2 style="font-size:22px;font-weight:750;color:var(--text-white);font-family:'Outfit',sans-serif;">관제 센터 홈</h2>
-          <p style="font-size:13px;color:var(--text-muted);margin-top:2px;">오늘 처리해야 할 작업, 회의록, 에이전트 상태를 한 번에 확인합니다.</p>
-        </div>
-        <div id="home-date" style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);padding:6px 12px;background:rgba(255,255,255,0.01);border:1px solid var(--border);border-radius:var(--radius-sm);flex-shrink:0;">2026-05-27 &bull; TUE</div>
-      </div>
-
-      <div class="home-brief">
-        <div class="home-focus">
-          <div class="home-focus-top">
-            <div style="min-width:0;">
-              <div class="home-eyebrow">Current Focus</div>
-              <div class="home-focus-title" id="home-focus-title">우선 작업을 불러오는 중입니다.</div>
-              <div class="home-focus-meta" id="home-focus-meta">작업 상태를 동기화하고 있습니다.</div>
-            </div>
-            <button class="muted-btn" onclick="nav('request')" style="flex-shrink:0;">작업 요청</button>
+      <div class="manifest-home">
+        <section class="manifest-header">
+          <div>
+            <div class="manifest-kicker">Operations Manifest</div>
+            <h2>오늘 운영판</h2>
+            <div class="manifest-summary" id="home-command-summary">업무 상태를 동기화하고 있습니다.</div>
           </div>
-          <div class="home-focus-progress">
-            <div class="home-focus-bar"><div id="home-focus-bar"></div></div>
-            <div class="home-focus-pct" id="home-focus-pct">0%</div>
-          </div>
-        </div>
-
-        <div class="home-signal-grid">
-          <div class="home-signal"><div class="label">진행</div><div class="value" id="home-kpi-active">0</div><div class="hint" id="home-active-hint">active tasks</div></div>
-          <div class="home-signal"><div class="label">대기</div><div class="value" id="home-kpi-pending">0</div><div class="hint" id="home-pending-hint">queued tasks</div></div>
-          <div class="home-signal"><div class="label">회의록</div><div class="value" id="home-kpi-meetings">0</div><div class="hint" id="home-meeting-hint">unprocessed</div></div>
-          <div class="home-signal"><div class="label">카테고리</div><div class="value" id="home-kpi-categories">0</div><div class="hint" id="home-category-hint">work groups</div></div>
-        </div>
-      </div>
-
-      <div class="home-action-grid" style="flex-shrink:0;margin-bottom:10px;">
-        <div class="home-action" onclick="nav('request')"><div class="icon">✉</div><strong>새 작업 요청</strong><span>요청을 업무 단위로 나누고 대화로 이어갑니다.</span></div>
-        <div class="home-action" onclick="nav('projects')"><div class="icon">▣</div><strong>프로젝트 판단</strong><span>큰 요청은 프로젝트로 올리고 단발 업무는 바로 처리합니다.</span></div>
-        <div class="home-action" onclick="nav('meetings')"><div class="icon">◫</div><strong>회의록 처리</strong><span>PLAUD 목록 업데이트와 미처리 회의록 분해를 확인합니다.</span></div>
-        <div class="home-action" onclick="nav('coverage')"><div class="icon">▦</div><strong>문구 커버리지</strong><span>결과지 문구 완성 범위와 빈 슬롯을 점검합니다.</span></div>
-      </div>
-
-      <div class="ops-flow-strip">
-        <div class="ops-flow-step" style="--step-color:var(--purple);"><div class="num">01</div><strong>회의록</strong><span>전사록에서 업무 후보 추출</span></div>
-        <div class="ops-flow-step" style="--step-color:var(--yellow);"><div class="num">02</div><strong>프로젝트 판단</strong><span>큰 흐름과 단발 작업 분리</span></div>
-        <div class="ops-flow-step" style="--step-color:var(--orange);"><div class="num">03</div><strong>작업지시서</strong><span>세부 업무 상태와 출력 확인</span></div>
-        <div class="ops-flow-step" style="--step-color:var(--cyan);"><div class="num">04</div><strong>캘린더</strong><span>마감과 실행 시간을 저장</span></div>
-      </div>
-
-      <div class="home-grid" style="margin-bottom:10px;">
-        <div class="col" style="gap:10px;min-height:0;overflow:hidden;">
-          <div class="card" style="flex-shrink:0;">
-            <div class="home-card-head">
-              <div class="card-title" style="margin-bottom:0;">오늘 꼭 해야 할 일 <span id="home-priority-count">(0)</span></div>
-              <span id="home-priority-badge" class="sbadge s-active">대기</span>
-            </div>
-            <div id="home-priority-list" style="display:flex;flex-direction:column;gap:10px;">
-              <div class="thin-row" style="color:var(--text-muted);font-size:12px;">작업 데이터를 불러오는 중입니다.</div>
+          <div>
+            <div id="home-date" class="manifest-date">2026-05-27 &bull; TUE</div>
+            <div class="manifest-totals" style="margin-top:10px;">
+              <div class="manifest-total"><span>진행</span><b id="home-kpi-active">0</b></div>
+              <div class="manifest-total"><span>대기</span><b id="home-kpi-pending">0</b></div>
+              <div class="manifest-total"><span>회의록</span><b id="home-kpi-meetings">0</b></div>
+              <div class="manifest-total"><span>분류</span><b id="home-kpi-categories">0</b></div>
             </div>
           </div>
+        </section>
 
-          <div class="card" style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;">
-            <div class="home-card-head">
-              <div class="card-title" style="margin-bottom:0;">진행판</div>
-              <button class="muted-btn" style="padding:5px 9px;font-size:11px;" onclick="nav('tasks')">전체 보기</button>
-            </div>
-            <div id="home-progress-list" style="display:flex;flex-direction:column;gap:10px;flex:1;overflow-y:auto;">
-              <div class="thin-row" style="color:var(--text-muted);font-size:12px;">진행 데이터를 불러오는 중입니다.</div>
+        <section class="manifest-focus">
+          <div class="manifest-index">01 / NOW</div>
+          <div>
+            <div class="manifest-focus-title" id="home-focus-title">우선 작업을 불러오는 중입니다.</div>
+            <div class="manifest-focus-meta" id="home-focus-meta">작업 상태를 동기화하고 있습니다.</div>
+            <div class="manifest-progress">
+              <div class="manifest-bar"><div id="home-focus-bar"></div></div>
+              <div class="manifest-pct" id="home-focus-pct">0%</div>
             </div>
           </div>
+          <div class="manifest-open">
+            <b id="home-radar-score">0</b>
+            <span>open</span>
+          </div>
+        </section>
 
-          <div class="card" id="home-video-card" style="flex-shrink:0;display:none;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-              <div class="card-title" style="margin-bottom:0;">영상 편집 진행</div>
-              <span id="home-video-task" style="font-size:11px;padding:2px 8px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);margin-left:4px;"></span>
-            </div>
-            <div style="margin-bottom:12px;">
-              <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-bottom:6px;">
-                <span id="home-video-file" style="color:var(--text-hover);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%;"></span>
-                <span id="home-video-pct" style="color:var(--text-white);font-weight:700;"></span>
-              </div>
-              <div style="height:6px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:3px;overflow:hidden;">
-                <div id="home-video-bar" style="height:100%;background:linear-gradient(90deg,var(--blue),#60a5fa);border-radius:3px;transition:width .5s ease;width:0%;"></div>
-              </div>
-            </div>
-            <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-muted);">
-              <span>파일 <span id="home-video-files" style="color:var(--text-hover);"></span></span>
-              <span onclick="nav('video')" style="color:var(--blue);cursor:pointer;font-weight:600;">자세히 →</span>
+        <section class="manifest-body">
+          <div>
+            <div class="manifest-section-title">업무 라인업</div>
+            <div class="manifest-table-head"><span>레인</span><span>수</span><span>현재 항목</span><span>상태</span></div>
+            <div id="home-control-lanes" class="manifest-table">
+              <div class="thin-row">레인을 불러오는 중입니다.</div>
             </div>
           </div>
-        </div>
+          <aside class="manifest-side">
+            <div class="manifest-section-title">우선 신호</div>
+            <div id="home-briefing-list">
+              <div class="thin-row">브리핑을 불러오는 중입니다.</div>
+            </div>
+          </aside>
+        </section>
 
-        <div class="col" style="gap:10px;min-height:0;overflow:hidden;">
-          <div class="card" style="flex-shrink:0;">
-            <div class="home-card-head">
-              <div class="card-title" style="margin-bottom:0;">에이전트 작업량</div>
-              <button class="muted-btn" style="padding:5px 9px;font-size:11px;" onclick="nav('agents')">열기</button>
-            </div>
-            <div id="home-agent-load" class="thin-list" style="max-height:160px;">
-              <div class="thin-row" style="color:var(--text-muted);font-size:12px;">에이전트 상태를 불러오는 중입니다.</div>
-            </div>
+        <section class="manifest-agents">
+          <div>
+            <div class="manifest-section-title">에이전트</div>
+            <button class="muted-btn" onclick="nav('agents')">열기</button>
           </div>
-
-          <div class="card" style="flex-shrink:0;">
-            <div class="home-card-head">
-              <div class="card-title" style="margin-bottom:0;">회의록 처리 대기</div>
-              <button class="muted-btn" style="padding:5px 9px;font-size:11px;" onclick="nav('meetings')">열기</button>
-            </div>
-            <div id="home-meeting-summary" class="thin-list" style="max-height:122px;">
-              <div class="thin-row" style="color:var(--text-muted);font-size:12px;">회의록 데이터를 불러오는 중입니다.</div>
-            </div>
+          <div id="home-agent-strip" class="manifest-agent-strip">
+            <div class="thin-row">에이전트 상태를 불러오는 중입니다.</div>
           </div>
-
-          <div class="card" style="flex-shrink:0;">
-            <div class="card-title" style="margin-bottom:10px;">카테고리별 미완료</div>
-            <div id="home-category-summary" class="thin-list" style="max-height:140px;">
-              <div class="thin-row" style="color:var(--text-muted);font-size:12px;">카테고리 데이터를 불러오는 중입니다.</div>
-            </div>
-          </div>
-
-          <div class="card" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;">
-            <div class="home-card-head">
-              <div class="card-title" style="margin-bottom:0;">최근 완료 / 활동</div>
-              <span id="home-complete-count" style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);">0 done</span>
-            </div>
-            <div id="home-completed-list" class="thin-list" style="max-height:130px;margin-bottom:8px;">
-              <div class="thin-row" style="color:var(--text-muted);font-size:12px;">완료된 작업을 불러오는 중입니다.</div>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:0;flex:1;overflow-y:auto;padding-right:4px;" id="home-activities">
-              <div class="thin-row" style="color:var(--text-muted);font-size:12px;">최근 활동을 불러오는 중입니다.</div>
-            </div>
-          </div>
-        </div>
+        </section>
       </div>
     </div>
 
@@ -6099,7 +7625,7 @@ body {
           <section class="task-detail-panel" id="task-detail-header">
             <div style="height:100%;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--text-muted);font-size:13px;line-height:1.6;">
               <div>
-                <div style="font-size:22px;margin-bottom:8px;">◎</div>
+                <div class="inline-action-icon" data-icon="clipboard-list" style="margin:0 auto 8px;color:var(--text-muted);"></div>
                 가운데 업무를 선택하면 작업 지시, 실행 결과, 로그가 표시됩니다.
               </div>
             </div>
@@ -6353,8 +7879,8 @@ body {
         <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
           <span style="font-size: 12px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">에이전트 필터:</span>
           <button class="nav-item active" style="padding: 4px 10px; font-size: 11.5px; border-radius: var(--radius-sm); margin-bottom: 0;" id="log-filter-all" onclick="filterLogs('all')">전체 로그</button>
-          <button class="nav-item" style="padding: 4px 10px; font-size: 11.5px; border-radius: var(--radius-sm); margin-bottom: 0;" id="log-filter-knowledge" onclick="filterLogs('knowledge')">지식담당 (◈)</button>
-          <button class="nav-item" style="padding: 4px 10px; font-size: 11.5px; border-radius: var(--radius-sm); margin-bottom: 0;" id="log-filter-phrase" onclick="filterLogs('phrase')">문구담당 (✦)</button>
+          <button class="nav-item" style="padding: 4px 10px; font-size: 11.5px; border-radius: var(--radius-sm); margin-bottom: 0;" id="log-filter-knowledge" onclick="filterLogs('knowledge')">지식담당</button>
+          <button class="nav-item" style="padding: 4px 10px; font-size: 11.5px; border-radius: var(--radius-sm); margin-bottom: 0;" id="log-filter-phrase" onclick="filterLogs('phrase')">문구담당</button>
         </div>
       </div>
 
@@ -6435,7 +7961,7 @@ body {
               미리보기
             </button>
             <button id="video-encoding-start-btn" onclick="startVideoEncoding()" style="padding: 10px 20px; border-radius: var(--radius-md); background: var(--green); border: none; color: var(--bg); font-size: 13.5px; font-weight: 700; cursor: pointer; transition: var(--transition); display: flex; align-items: center; gap: 8px;">
-              인코딩 작업 요청 <span>▶</span>
+              인코딩 작업 요청 <span class="inline-action-icon" data-icon="captions"></span>
             </button>
           </div>
 
@@ -6774,7 +8300,7 @@ body {
 <div class="cmd-palette" id="cmd-palette" onclick="closeCmdPalette(event)">
   <div class="cmd-box" onclick="event.stopPropagation()">
     <div class="cmd-input-container">
-      <span class="cmd-icon">🔍</span>
+      <span class="cmd-icon" data-icon="search"></span>
       <input type="text" class="cmd-input" id="cmd-input" placeholder="원하는 메뉴나 명령을 검색하세요... (예: 홈, 에이전트, 자막)" oninput="filterCmdItems()">
     </div>
     <div class="cmd-results" id="cmd-results">
@@ -6884,6 +8410,74 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+const ICON_PATHS = {
+  home: `<path d="m3 10.8 9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/>`,
+  help: `<circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.4 2.4 0 0 1 4.6 1.1c0 1.8-2.4 2.2-2.4 4"/><path d="M12 17h.01"/>`,
+  bot: `<rect x="5" y="7" width="14" height="11" rx="2"/><path d="M12 7V4"/><path d="M8.5 12h.01"/><path d="M15.5 12h.01"/><path d="M9 18v2"/><path d="M15 18v2"/><path d="M8 15h8"/>`,
+  kanban: `<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M9 5v14"/><path d="M15 5v14"/><path d="M4 10h5"/><path d="M15 13h5"/>`,
+  send: `<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>`,
+  'clipboard-list': `<rect x="8" y="3" width="8" height="4" rx="1"/><path d="M16 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/><path d="M9 12h6"/><path d="M9 16h6"/>`,
+  calendar: `<path d="M8 2v4"/><path d="M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/>`,
+  mic: `<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/><path d="M8 22h8"/>`,
+  grid: `<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>`,
+  'list-checks': `<path d="m3 7 2 2 4-4"/><path d="M11 6h10"/><path d="m3 17 2 2 4-4"/><path d="M11 16h10"/>`,
+  'shield-check': `<path d="M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5l8-3 8 3Z"/><path d="m9 12 2 2 4-4"/>`,
+  captions: `<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15h4"/><path d="M15 15h2"/><path d="M7 11h2"/><path d="M13 11h4"/>`,
+  scissors: `<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.1 15.9"/><path d="m14.5 14.5 5.5 5.5"/><path d="M8.1 8.1 12 12"/>`,
+  search: `<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>`,
+  hexagon: `<path d="m12 2 8 4.6v10.8L12 22l-8-4.6V6.6Z"/><path d="M12 8v8"/><path d="m8.5 10 3.5-2 3.5 2"/><path d="m8.5 14 3.5 2 3.5-2"/>`,
+  'book-open': `<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v18H6.5A2.5 2.5 0 0 0 4 18.5Z"/><path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H13v18h4.5a2.5 2.5 0 0 1 2.5-2.5Z"/><path d="M7 7h2"/><path d="M15 7h2"/><path d="M7 11h2"/><path d="M15 11h2"/>`,
+  'knowledge-map': `<circle cx="6" cy="7" r="2.2"/><circle cx="18" cy="7" r="2.2"/><circle cx="12" cy="17" r="2.2"/><path d="M8.2 7h7.6"/><path d="m7.2 9 3.6 6.1"/><path d="m16.8 9-3.6 6.1"/><path d="M12 10v2"/>`,
+  'brain-circuit': `<path d="M9 3a3 3 0 0 0-3 3v1.2A3.5 3.5 0 0 0 4 10.4 3.5 3.5 0 0 0 6.2 14 3.2 3.2 0 0 0 9 19h1V3Z"/><path d="M15 3a3 3 0 0 1 3 3v1.2a3.5 3.5 0 0 1 2 3.2 3.5 3.5 0 0 1-2.2 3.6A3.2 3.2 0 0 1 15 19h-1V3Z"/><path d="M10 9H7"/><path d="M17 9h-3"/><path d="M10 13H8"/><path d="M16 13h-2"/><path d="M12 19v3"/>`,
+  type: `<path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/>`,
+  flag: `<path d="M5 21V4"/><path d="M5 4h12l-2 4 2 4H5"/><path d="M5 21h14"/>`,
+  'plan-board': `<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 8h8"/><path d="M8 12h4"/><path d="M8 16h2"/><path d="m14 17 4-4"/><path d="m18 13 2 2"/><path d="m13 20 3.5-.8"/>`,
+  route: `<circle cx="6" cy="19" r="3"/><circle cx="18" cy="5" r="3"/><path d="M9 19h3a6 6 0 0 0 0-12H9"/>`,
+  video: `<rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3Z"/>`,
+  settings: `<path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2 3.4-.2-.1a1.7 1.7 0 0 0-1.9.3 1.7 1.7 0 0 0-.6 1.7H9a1.7 1.7 0 0 0-.6-1.7 1.7 1.7 0 0 0-1.9-.3l-.2.1-2-3.4.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.4-1.1V9.1A1.7 1.7 0 0 0 4.7 8a1.7 1.7 0 0 0-.3-1.9l-.1-.1 2-3.4.2.1a1.7 1.7 0 0 0 1.9-.3A1.7 1.7 0 0 0 9 .7h6a1.7 1.7 0 0 0 .6 1.7 1.7 1.7 0 0 0 1.9.3l.2-.1 2 3.4-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.4 1.1v5.8a1.7 1.7 0 0 0-1.3.1Z"/>`,
+  corner: `<path d="m9 10-4 4 4 4"/><path d="M5 14h10a4 4 0 0 0 4-4V6"/>`,
+  dot: `<circle cx="12" cy="12" r="2.5"/>`
+};
+
+const LEGACY_ICON_MAP = {
+  '◈': 'knowledge-map',
+  '✦': 'type',
+  '◎': 'plan-board',
+  '▶': 'video',
+  '◇': 'bot',
+  '⚙': 'settings',
+  '↳': 'corner',
+  '•': 'dot'
+};
+
+function normalizeIconName(name, fallback = 'bot') {
+  const key = String(name || '').trim();
+  return ICON_PATHS[key] ? key : (LEGACY_ICON_MAP[key] || fallback);
+}
+
+function iconSvg(name, className = 'ui-icon') {
+  const key = normalizeIconName(name, 'bot');
+  return `<svg class="${className}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICON_PATHS[key]}</svg>`;
+}
+
+function hydrateStaticIcons(root = document) {
+  root.querySelectorAll('[data-icon]').forEach(el => {
+    const key = normalizeIconName(el.dataset.icon);
+    if (ICON_PATHS[key]) el.innerHTML = iconSvg(key);
+  });
+}
+
+function agentIconSvg(agentOrIcon) {
+  const raw = typeof agentOrIcon === 'string' ? agentOrIcon : agentOrIcon?.icon;
+  return iconSvg(normalizeIconName(raw, 'bot'));
+}
+
+function avatarContent(value) {
+  const raw = String(value || '');
+  const key = normalizeIconName(raw, '');
+  return key && ICON_PATHS[key] ? iconSvg(key) : escapeHtml(raw);
 }
 
 function fetchWithTimeout(url, options = {}, timeoutMs = 3000) {
@@ -7794,7 +9388,7 @@ function taskWorkedLabel(task) {
 function requestMessage(type, avatar, body, meta = '') {
   return `
     <div class="request-message ${type}">
-      <div class="avatar">${escapeHtml(avatar)}</div>
+      <div class="avatar">${avatarContent(avatar)}</div>
       <div>
         ${meta && type !== 'user' ? `<div class="request-message-meta">${escapeHtml(meta)}</div>` : ''}
         <div class="bubble"><div class="request-agent-body">${body}</div></div>
@@ -7823,7 +9417,7 @@ function renderDraftConversation() {
   `;
   const text = document.getElementById('task-composer-textarea')?.value.trim() || '';
   messagesEl.innerHTML = `
-    ${requestMessage('agent', '◎', '새 요청을 아래 입력창에 적어주세요. 한 줄에 하나씩 적으면 그대로 세부 업무 카드로 나뉘고, 회의록/문구/지식/디자인 키워드는 자동으로 카테고리와 담당을 추정합니다.', 'Ready ›')}
+    ${requestMessage('agent', 'bot', '새 요청을 아래 입력창에 적어주세요. 한 줄에 하나씩 적으면 그대로 세부 업무 카드로 나뉘고, 회의록/문구/지식/디자인 키워드는 자동으로 카테고리와 담당을 추정합니다.', 'Ready ›')}
     ${text ? requestMessage('user', '나', escapeHtml(text), '작성 중') : ''}
   `;
   updateRequestDraftPanel();
@@ -7886,7 +9480,7 @@ function renderRequestChat() {
 
   messagesEl.innerHTML = `
     ${requestMessage('user', '나', escapeHtml(instruction || task.title || ''), '작업 지시')}
-    ${requestMessage('agent', agentData[task.agent]?.icon || '◎', statusBody, taskWorkedLabel(task))}
+    ${requestMessage('agent', agentData[task.agent]?.icon || 'bot', statusBody, taskWorkedLabel(task))}
     ${logMessages}
     ${resultText ? requestMessage('agent', runnerLabel === 'Codex' ? 'C' : 'Cl', `<div class="request-output-text">${formatMessageText(resultText)}</div>`, task.completed_at ? taskWorkedLabel(task) : 'Current output ›') : ''}
   `;
@@ -8113,10 +9707,9 @@ function renderHomeOverview(data = {}) {
   setText('home-kpi-pending', pendingTasks.length);
   setText('home-kpi-meetings', unprocessedMeetings);
   setText('home-kpi-categories', categoryCount);
-  setText('home-active-hint', activeTasks[0]?.title || '실행 중 작업');
-  setText('home-pending-hint', pendingTasks[0]?.title || '대기 중 작업');
-  setText('home-meeting-hint', unprocessedMeetings ? '처리 대기 회의록' : '대기 없음');
-  setText('home-category-hint', '업무 분류 기준');
+  setText('home-command-summary', `진행 ${activeTasks.length} · 대기 ${pendingTasks.length} · 미처리 회의록 ${unprocessedMeetings} · 완료 ${doneTasks.length}`);
+  setText('home-complete-count', `${doneTasks.length} done`);
+  setText('home-radar-score', openTasks.length);
 
   const score = { high: 3, normal: 2, low: 1 };
   const focusTask = [...openTasks].sort((a, b) => {
@@ -8126,130 +9719,133 @@ function renderHomeOverview(data = {}) {
       || taskTimestamp(b) - taskTimestamp(a);
   })[0] || doneTasks[0];
   if (focusTask) {
-    const focusProgress = Number.isFinite(Number(focusTask.progress)) ? Number(focusTask.progress) : 0;
+    const focusProgress = Math.max(0, Math.min(100, Number.isFinite(Number(focusTask.progress)) ? Number(focusTask.progress) : 0));
     const focusCat = inferTaskCategory(focusTask);
     setText('home-focus-title', focusTask.title || '작업 없음');
     setText('home-focus-meta', `${focusTask.agentName || '자동'} · ${taskStatusLabel(focusTask.status)} · ${focusCat.name}`);
     setText('home-focus-pct', `${focusProgress}%`);
     const focusBar = document.getElementById('home-focus-bar');
     if (focusBar) focusBar.style.width = `${focusProgress}%`;
+  } else {
+    setText('home-focus-title', '열린 작업이 없습니다.');
+    setText('home-focus-meta', '대기 중');
+    setText('home-focus-pct', '0%');
+  }
+
+  const openProgressAvg = openTasks.length
+    ? Math.round(openTasks.reduce((sum, t) => sum + (Number(t.progress) || 0), 0) / openTasks.length)
+    : 0;
+  const radarCore = document.getElementById('home-radar-core');
+  if (radarCore) {
+    radarCore.style.setProperty('--radar-progress', String(openProgressAvg));
+  }
+
+  const taskLine = (task, emptyText) => task
+    ? {
+        title: task.title || '제목 없는 작업',
+        note: `${task.agentName || '자동'} · ${taskStatusLabel(task.status)} · ${inferTaskCategory(task).name}`,
+      }
+    : { title: emptyText, note: '대기 없음' };
+  const highTasks = openTasks.filter(t => t.priority === 'high');
+  const newestDone = [...doneTasks].sort((a, b) => taskTimestamp(b) - taskTimestamp(a))[0];
+  const laneData = [
+    { label: '긴급', count: highTasks.length, ...taskLine(highTasks[0], '긴급 작업 없음') },
+    { label: '진행', count: activeTasks.length, ...taskLine(activeTasks[0], '진행 작업 없음') },
+    { label: '대기', count: pendingTasks.length, ...taskLine(pendingTasks[0], '대기 작업 없음') },
+    {
+      label: '회의록',
+      count: unprocessedMeetings,
+      title: meetingData.find(m => m.status !== 'processed')?.title || '미처리 회의록 없음',
+      note: unprocessedMeetings ? '처리 대기' : '대기 없음',
+    },
+  ];
+  const laneBoard = document.getElementById('home-control-lanes');
+  if (laneBoard) {
+    laneBoard.innerHTML = laneData.map(lane => `
+      <div class="manifest-line">
+        <div class="manifest-line-label">${escapeHtml(lane.label)}</div>
+        <div class="manifest-line-count">${escapeHtml(String(lane.count))}</div>
+        <div class="manifest-line-title">${escapeHtml(lane.title)}</div>
+        <div class="manifest-line-note">${escapeHtml(lane.note)}</div>
+      </div>
+    `).join('');
   }
 
   const priorityItems = [...openTasks]
     .sort((a, b) => (score[b.priority] || 0) - (score[a.priority] || 0) || taskTimestamp(b) - taskTimestamp(a))
-    .slice(0, 4);
-  const priorityList = document.getElementById('home-priority-list');
-  if (priorityList) {
-    const badge = document.getElementById('home-priority-badge');
-    document.getElementById('home-priority-count').textContent = `(${priorityItems.length})`;
-    if (badge) {
-      badge.textContent = priorityItems.some(t => t.priority === 'high') ? '긴급 포함' : '대기';
-      badge.className = `sbadge ${priorityItems.some(t => t.priority === 'high') ? 's-error' : 's-active'}`;
-    }
-    priorityList.innerHTML = priorityItems.length ? priorityItems.map(t => {
-      const cat = inferTaskCategory(t);
-      const priorityClass = t.priority === 'high' ? 'high' : (t.priority === 'low' ? 'low' : 'normal');
-      return `
-        <div class="home-work-row ${priorityClass} ${escapeHtml(t.status || '')}" onclick="nav('request')" style="cursor:pointer;">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
-            <div style="min-width:0;">
-              <div class="home-work-title">${escapeHtml(t.title)}</div>
-              <div class="home-work-meta"><span>${escapeHtml(t.agentName || '자동')} · ${escapeHtml(taskStatusLabel(t.status))}</span><span>${escapeHtml(t.runner?.active || t.runnerPreference || 'claude')}</span></div>
-            </div>
-            ${categoryChip(cat.name, cat.color)}
-          </div>
-        </div>`;
-    }).join('') : '<div class="thin-row" style="color:var(--text-muted);font-size:12px;">현재 대기 중인 우선 작업이 없습니다.</div>';
+    .slice(0, 4)
+    .map(t => ({
+      type: 'task',
+      title: t.title || '제목 없는 작업',
+      meta: `${t.agentName || '자동'} · ${taskStatusLabel(t.status)} · ${inferTaskCategory(t).name}`,
+      priority: t.priority || 'normal',
+    }));
+  const meetingItems = meetingData
+    .filter(m => m.status !== 'processed')
+    .slice(0, 2)
+    .map(m => ({
+      type: 'meeting',
+      title: m.title || '제목 없는 회의록',
+      meta: `${meetingStatusLabel(m.status)} · ${formatShortDate(m.recorded_at)} · ${formatDuration(m.duration)}`,
+      priority: 'low',
+    }));
+  const briefingList = document.getElementById('home-briefing-list');
+  if (briefingList) {
+    const briefing = [...priorityItems, ...meetingItems].slice(0, 5);
+    briefingList.innerHTML = briefing.length ? briefing.map(item => `
+      <div class="manifest-alert ${escapeHtml(item.priority)}" onclick="nav('${item.type === 'meeting' ? 'meetings' : 'tasks'}')">
+        <div>
+          <strong>${escapeHtml(item.title)}</strong>
+          <span>${escapeHtml(item.meta)}</span>
+        </div>
+      </div>
+    `).join('') : '<div class="thin-row">브리핑할 열린 신호가 없습니다.</div>';
   }
 
-  const progressList = document.getElementById('home-progress-list');
-  if (progressList) {
-    const progressItems = [...openTasks].sort((a, b) => taskTimestamp(b) - taskTimestamp(a)).slice(0, 6);
-    progressList.innerHTML = progressItems.length ? progressItems.map(t => {
-      const progress = Number.isFinite(Number(t.progress)) ? Number(t.progress) : 0;
-      const cat = inferTaskCategory(t);
-      return `
-        <div class="home-work-row ${t.priority || 'normal'} ${escapeHtml(t.status || '')}">
-          <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
-            <div style="min-width:0;">
-              <div class="home-work-title">${escapeHtml(t.title)}</div>
-              <div class="home-work-meta"><span>${escapeHtml(taskStatusLabel(t.status))} · ${escapeHtml(t.agentName || '')}</span><span>${progress}%</span></div>
-            </div>
-            ${categoryChip(cat.name, cat.color)}
-          </div>
-          <div style="height:5px;background:rgba(255,255,255,0.025);border:1px solid var(--border);border-radius:4px;overflow:hidden;margin-top:9px;">
-            <div style="width:${progress}%;height:100%;background:${t.status === 'error' ? 'var(--red)' : (t.status === 'active' ? 'linear-gradient(90deg,var(--blue),#60a5fa)' : 'linear-gradient(90deg,var(--green),#34d399)')};border-radius:4px;"></div>
-          </div>
-        </div>`;
-    }).join('') : '<div class="thin-row" style="color:var(--text-muted);font-size:12px;">진행 또는 대기 중인 작업이 없습니다.</div>';
-  }
-
-  const agentLoad = document.getElementById('home-agent-load');
-  if (agentLoad) {
-    const agentRows = Object.entries(agentData).map(([key, agent]) => {
+  const agentStrip = document.getElementById('home-agent-strip');
+  if (agentStrip) {
+    const agentRows = Object.entries(agentData).slice(0, 6).map(([key, agent]) => {
       const assigned = taskData.filter(t => t.agent === key);
       const open = assigned.filter(t => t.status !== 'done');
       const active = assigned.filter(t => t.status === 'active').length;
       const avg = open.length
         ? Math.round(open.reduce((sum, t) => sum + (Number(t.progress) || 0), 0) / open.length)
-        : 100;
-      return { key, agent, count: assigned.length, open: open.length, active, avg };
+        : (assigned.length ? 100 : 0);
+      return { key, agent, count: assigned.length, open: open.length, active, avg: Math.max(0, Math.min(100, avg)) };
     });
-    agentLoad.innerHTML = agentRows.map(row => `
-      <div class="home-agent-row">
-        <div class="home-agent-icon">${escapeHtml(row.agent.icon || '◎')}</div>
+    agentStrip.innerHTML = agentRows.length ? agentRows.map(row => `
+      <div class="manifest-agent">
+        <div class="manifest-agent-icon">${agentIconSvg(row.agent)}</div>
         <div style="min-width:0;">
-          <div class="home-agent-name">${escapeHtml(row.agent.name)}</div>
-          <div class="home-agent-progress"><div style="width:${row.avg}%;background:${row.key === 'knowledge' ? 'linear-gradient(90deg,var(--green),#34d399)' : row.key === 'phrase' ? 'linear-gradient(90deg,var(--blue),#60a5fa)' : 'linear-gradient(90deg,var(--purple),#a78bfa)'};"></div></div>
+          <div class="manifest-agent-name">${escapeHtml(row.agent.name || row.key)}</div>
+          <div class="manifest-agent-meta">진행 ${row.active} · 열림 ${row.open}</div>
+          <div class="manifest-agent-bar"><div style="width:${row.avg}%;"></div></div>
         </div>
-        <div class="home-agent-load">진행 ${row.active}<br>열림 ${row.open}</div>
+        <div class="manifest-agent-count">${row.count}건</div>
       </div>
-    `).join('');
+    `).join('') : '<div class="thin-row">에이전트 상태가 없습니다.</div>';
   }
 
-  const meetingSummary = document.getElementById('home-meeting-summary');
-  if (meetingSummary) {
-    const openMeetings = meetingData.filter(m => m.status !== 'processed').slice(0, 3);
-    meetingSummary.innerHTML = openMeetings.length ? openMeetings.map(m => `
-      <div class="thin-row" onclick="nav('meetings')" style="cursor:pointer;">
-        <div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;">
-          <strong style="font-size:12px;color:var(--text-white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(m.title)}</strong>
-          <span class="sbadge ${m.status === 'processing' ? 's-active' : 's-pending'}" style="font-size:9.5px;padding:1px 6px;">${m.status === 'processing' ? '처리중' : '미처리'}</span>
-        </div>
-        <div style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-muted);">${formatShortDate(m.recorded_at)} · ${formatDuration(m.duration)}</div>
-      </div>`).join('') : '<div class="thin-row" style="color:var(--text-muted);font-size:12px;">미처리 회의록이 없습니다.</div>';
-  }
-
-  const categorySummary = document.getElementById('home-category-summary');
-  if (categorySummary) {
-    const counts = new Map();
-    taskData.forEach(t => {
+  const recentFeed = document.getElementById('home-recent-feed');
+  if (recentFeed) {
+    const activityRows = (data.activities || []).slice(0, 3).map(a => ({
+      title: a.text || a.title || a.message || '최근 활동',
+      meta: `${a.time || formatShortDate(a.created_at)}${a.agentLabel || a.agent ? ` · ${a.agentLabel || a.agent}` : ''}`,
+    }));
+    const completedRows = [...doneTasks].sort((a, b) => taskTimestamp(b) - taskTimestamp(a)).slice(0, 3).map(t => {
       const cat = inferTaskCategory(t);
-      const current = counts.get(cat.name) || { ...cat, count: 0, active: 0 };
-      current.count += 1;
-      if (t.status === 'active' || t.status === 'pending') current.active += 1;
-      counts.set(cat.name, current);
+      return {
+        title: t.title || '완료된 작업',
+        meta: `${cat.name} · ${t.agentName || '자동'}`,
+      };
     });
-    const rows = [...counts.values()].sort((a,b) => b.active - a.active || b.count - a.count).slice(0, 6);
-    categorySummary.innerHTML = rows.length ? rows.map(c => `
-      <div class="thin-row" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        ${categoryChip(c.name, c.color)}
-        <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);">${c.active}/${c.count}</span>
-      </div>`).join('') : '<div class="thin-row" style="color:var(--text-muted);font-size:12px;">카테고리 작업이 없습니다.</div>';
-  }
-
-  const completedList = document.getElementById('home-completed-list');
-  if (completedList) {
-    setText('home-complete-count', `${doneTasks.length} done`);
-    const completed = [...doneTasks].sort((a, b) => taskTimestamp(b) - taskTimestamp(a)).slice(0, 3);
-    completedList.innerHTML = completed.length ? completed.map(t => {
-      const cat = inferTaskCategory(t);
-      return `
-        <div class="home-complete-row">
-          <div class="home-complete-title">${escapeHtml(t.title)}</div>
-          <div class="home-complete-meta"><span>${escapeHtml(cat.name)} · ${escapeHtml(t.agentName || '')}</span><span>${escapeHtml(t.runner?.active || t.runnerPreference || '')}</span></div>
-        </div>`;
-    }).join('') : '<div class="thin-row" style="color:var(--text-muted);font-size:12px;">완료된 작업이 없습니다.</div>';
+    const rows = activityRows.length ? activityRows : completedRows;
+    recentFeed.innerHTML = rows.length ? rows.map(row => `
+      <div class="control-feed-item">
+        <strong>${escapeHtml(row.title)}</strong>
+        <span>${escapeHtml(row.meta)}</span>
+      </div>
+    `).join('') : '<div class="thin-row">최근 처리 기록이 없습니다.</div>';
   }
 }
 
@@ -8741,7 +10337,7 @@ const pageTitles = {
 const agentData = {
   knowledge: {
     name: '지식담당',
-    icon: '◈',
+    icon: 'knowledge-map',
     status: 'Active',
     taskNow: '조합 설명 작성 중',
     role: '유형 정의·조합 설명 저작 및 고도화, 정합성 진단·파급 추적. 지식 파일이 단일 진실 출처가 되도록 유지한다.',
@@ -8765,7 +10361,7 @@ const agentData = {
   },
   phrase: {
     name: '문구담당',
-    icon: '✦',
+    icon: 'type',
     status: '대기 중',
     taskNow: '지식 확정 대기',
     role: '결과지 화면 문구 수정·생성. 연결키·위치 변경 없이 본문만 다듬고, 모든 수정에 근거를 decisions/에 남긴다.',
@@ -8788,7 +10384,7 @@ const agentData = {
   },
   plan: {
     name: '기획담당',
-    icon: '◎',
+    icon: 'plan-board',
     status: '대기 중',
     taskNow: '대기',
     role: 'CRATA 검사를 활용한 프로그램·워크숍·교육 기획안 작성. 파일을 직접 고치지 않고 기획 초안을 돌려준다.',
@@ -8806,7 +10402,7 @@ const agentData = {
   },
   media: {
     name: '영상담당',
-    icon: '▶',
+    icon: 'video',
     status: '대기 중',
     taskNow: '영상 처리 대기',
     role: '데스크탑 GPU 환경에서 영상 전사, 화자분리, 전사 품질검토, CRATA 용어 교정, 자막 하드코딩, 최종 인코딩을 수행한다.',
@@ -8864,9 +10460,9 @@ const taskData = [
       { name: '기획담당', role: '관여 없음', progress: 0, status: 'idle' }
     ],
     collabLogs: [
-      { sender: '지식담당', icon: '◈', msg: '비교형 조합 설명 23개 항목 기틀 저작 중', time: '15:42' },
-      { sender: '문구담당', icon: '✦', msg: '지식담당의 초안 작성 알림 수신. 윤문 준비 완료.', time: '15:45' },
-      { sender: '기획담당', icon: '◎', msg: '조합설명 구조 decisions/log/ 에 반영 감시 중', time: '15:46' }
+      { sender: '지식담당', icon: 'knowledge-map', msg: '비교형 조합 설명 23개 항목 기틀 저작 중', time: '15:42' },
+      { sender: '문구담당', icon: 'type', msg: '지식담당의 초안 작성 알림 수신. 윤문 준비 완료.', time: '15:45' },
+      { sender: '기획담당', icon: 'plan-board', msg: '조합설명 구조 decisions/log/ 에 반영 감시 중', time: '15:46' }
     ],
     collabStats: { calls: 14, tokens: '86.4K', cost: '$0.26', speed: '1.4s' }
   },
@@ -8886,9 +10482,9 @@ const taskData = [
       { name: '기획담당', role: '관여 없음', progress: 0, status: 'idle' }
     ],
     collabLogs: [
-      { sender: '지식담당', icon: '◈', msg: '유형 정의 확정 및 문구담당 검토 승인 완료.', time: '10:12' },
-      { sender: '문구담당', icon: '✦', msg: '중심역량 과제형/관계형 초안 저작 작업에 착수했습니다.', time: '10:15' },
-      { sender: '기획담당', icon: '◎', msg: '기획 기준선 정합성 체크: 정상.', time: '10:20' }
+      { sender: '지식담당', icon: 'knowledge-map', msg: '유형 정의 확정 및 문구담당 검토 승인 완료.', time: '10:12' },
+      { sender: '문구담당', icon: 'type', msg: '중심역량 과제형/관계형 초안 저작 작업에 착수했습니다.', time: '10:15' },
+      { sender: '기획담당', icon: 'plan-board', msg: '기획 기준선 정합성 체크: 정상.', time: '10:20' }
     ],
     collabStats: { calls: 8, tokens: '42.1K', cost: '$0.13', speed: '1.1s' }
   },
@@ -8908,10 +10504,10 @@ const taskData = [
       { name: '기획담당', role: '내보내기 실행', progress: 0, status: 'active' }
     ],
     collabLogs: [
-      { sender: '기획담당', icon: '◎', msg: '보고용 docx 템플릿 로딩 완료. 데이터 대기 중.', time: '09:05' },
-      { sender: '지식담당', icon: '◈', msg: '16행동유형 데이터 및 조직 10유형 최신 내용 취합 완료.', time: '09:10' },
-      { sender: '문구담당', icon: '✦', msg: '문구 정합성 및 오류 검출 완료. 전체 데이터 깨끗함.', time: '09:12' },
-      { sender: '기획담당', icon: '◎', msg: '내보내기 스크립트 구동 준비 완료.', time: '09:15' }
+      { sender: '기획담당', icon: 'plan-board', msg: '보고용 docx 템플릿 로딩 완료. 데이터 대기 중.', time: '09:05' },
+      { sender: '지식담당', icon: 'knowledge-map', msg: '16행동유형 데이터 및 조직 10유형 최신 내용 취합 완료.', time: '09:10' },
+      { sender: '문구담당', icon: 'type', msg: '문구 정합성 및 오류 검출 완료. 전체 데이터 깨끗함.', time: '09:12' },
+      { sender: '기획담당', icon: 'plan-board', msg: '내보내기 스크립트 구동 준비 완료.', time: '09:15' }
     ],
     collabStats: { calls: 5, tokens: '18.9K', cost: '$0.06', speed: '0.9s' }
   },
@@ -8930,9 +10526,9 @@ const taskData = [
       { name: '문구담당', role: '검수 반영 완료', progress: 100, status: 'done' }
     ],
     collabLogs: [
-      { sender: '지식담당', icon: '◈', msg: '비트패턴 기준 행동유형 16개 정의 전면 개정.', time: '14:20' },
-      { sender: '문구담당', icon: '✦', msg: '각 유형의 뉘앙스 검수 및 윤문 반영 완료.', time: '14:32' },
-      { sender: '지식담당', icon: '◈', msg: '최종 검증 완료, 마스터 브랜치 머지.', time: '14:40' }
+      { sender: '지식담당', icon: 'knowledge-map', msg: '비트패턴 기준 행동유형 16개 정의 전면 개정.', time: '14:20' },
+      { sender: '문구담당', icon: 'type', msg: '각 유형의 뉘앙스 검수 및 윤문 반영 완료.', time: '14:32' },
+      { sender: '지식담당', icon: 'knowledge-map', msg: '최종 검증 완료, 마스터 브랜치 머지.', time: '14:40' }
     ],
     collabStats: { calls: 32, tokens: '194.2K', cost: '$0.58', speed: '1.6s' }
   },
@@ -8950,9 +10546,9 @@ const taskData = [
       { name: '지식담당', role: '주동 저작자', progress: 100, status: 'done' }
     ],
     collabLogs: [
-      { sender: '지식담당', icon: '◈', msg: '판단 기준 4축 신설 기획 시작.', time: '11:00' },
-      { sender: '지식담당', icon: '◈', msg: '지식 파일 지식/행동방식4축.md 생성 및 정합성 검사 통과.', time: '11:30' },
-      { sender: '기획담당', icon: '◎', msg: '의사결정 이력(decisions/log/)에 기록 등재.', time: '11:45' }
+      { sender: '지식담당', icon: 'knowledge-map', msg: '판단 기준 4축 신설 기획 시작.', time: '11:00' },
+      { sender: '지식담당', icon: 'knowledge-map', msg: '지식 파일 지식/행동방식4축.md 생성 및 정합성 검사 통과.', time: '11:30' },
+      { sender: '기획담당', icon: 'plan-board', msg: '의사결정 이력(decisions/log/)에 기록 등재.', time: '11:45' }
     ],
     collabStats: { calls: 12, tokens: '64.0K', cost: '$0.19', speed: '1.2s' }
   }
@@ -9222,6 +10818,7 @@ const simulatedStepFractions = [0, 0, 0, 0];
 
 document.addEventListener('DOMContentLoaded', () => {
   document.body.dataset.page = 'home';
+  hydrateStaticIcons();
   // Load Default States
   renderTasks();
   updateCovKPIs();
@@ -9620,7 +11217,7 @@ function renderAgents() {
     return `
       <div class="agent-roster-card ${key === selectedAgentKey ? 'active' : ''}" style="--agent-color:${color};" onclick="selectAgent('${escapeHtml(escapeJs(key))}')">
         <div class="agent-roster-top">
-          <div class="agent-roster-icon">${escapeHtml(d.icon || '◇')}</div>
+          <div class="agent-roster-icon">${agentIconSvg(d)}</div>
           <div style="min-width:0;">
             <div class="agent-roster-name">${escapeHtml(d.name)}</div>
             <div class="agent-roster-work">${escapeHtml(d.taskNow || '대기')}</div>
@@ -9699,7 +11296,7 @@ function renderAgents() {
   detailEl.innerHTML = `
     <div class="agent-detail-header">
       <div class="agent-detail-title">
-        <div class="agent-detail-icon">${escapeHtml(selected.icon || '◇')}</div>
+        <div class="agent-detail-icon">${agentIconSvg(selected)}</div>
         <div>
           <div class="agent-detail-name">${escapeHtml(selected.name)}</div>
           <div class="agent-detail-sub">${escapeHtml(selected.taskNow || '대기')}</div>
@@ -9767,8 +11364,9 @@ function renderAgents() {
           const load = Math.min(100, Math.max(8, stats.open * 28 + stats.active * 24));
           return `
             <div class="agent-lane-row" style="--agent-color:${color};">
+              <span class="agent-lane-title-icon">${agentIconSvg(d)}</span>
               <div class="agent-lane-name">
-                <strong>${escapeHtml(d.icon || '◇')} ${escapeHtml(d.name)}</strong>
+                <strong>${escapeHtml(d.name)}</strong>
                 <span>열린 업무 ${stats.open}개 · 스킬 ${stats.skillsOn}개</span>
               </div>
               <div class="agent-lane-load" style="--load:${load}%"><div></div></div>
@@ -9793,7 +11391,7 @@ function createAgentDraft() {
   const key = `agent_${Date.now().toString(36)}`;
   agentData[key] = {
     name: `신규 에이전트 ${next}`,
-    icon: '◇',
+    icon: 'bot',
     status: '대기 중',
     taskNow: '역할 설계 대기',
     role: '담당 역할과 접근 권한을 정의하세요.',
@@ -10560,7 +12158,7 @@ function renderKanban() {
         <h5 style="font-size:12.5px; color:var(--text-hover); font-weight:600; margin-bottom:4px;">${escapeHtml(t.title)}</h5>
         <div style="margin-top:6px;">${categoryChip(cat.name, cat.color)}</div>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:10.5px;">
-          <span style="color:var(--text-muted); font-family:var(--font-mono);">${agentData[t.agent] ? agentData[t.agent].icon : ''} ${agentData[t.agent] ? agentData[t.agent].name.substring(0,2) : ''}</span>
+          <span class="task-agent-compact" style="${agentData[t.agent] ? `--agent-color:${agentColorFor(t.agent)};` : ''}">${agentData[t.agent] ? agentIconSvg(agentData[t.agent]) : ''}<span>${agentData[t.agent] ? escapeHtml(agentData[t.agent].name.substring(0,2)) : ''}</span></span>
           <span style="font-family:var(--font-mono); color:${t.status === 'error' ? 'var(--red)' : 'var(--green)'}; font-weight:600;">${Number.isFinite(Number(t.progress)) ? Number(t.progress) : 0}%</span>
         </div>
       </div>
