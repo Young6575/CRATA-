@@ -8991,44 +8991,70 @@ function dedupeTaskData() {
   return selectedTaskIdx;
 }
 
+function currentPageId() {
+  return document.body.dataset.page || 'home';
+}
+
+function renderTaskUpdatesForPage(page, data) {
+  if (page === 'tasks') {
+    renderTasks();
+    if (selectedTaskIdx >= 0) selectTask(selectedTaskIdx);
+    return;
+  }
+  if (page === 'calendar') {
+    renderCalendarTaskOptions();
+    renderCalendar();
+    return;
+  }
+  if (page === 'request') {
+    renderRequestProgress();
+    return;
+  }
+  if (page === 'projects') {
+    renderProjects();
+    return;
+  }
+  if (page === 'review') {
+    renderReviews();
+    return;
+  }
+}
+
 function applyServerData(data) {
+  const page = currentPageId();
   // 1) 수정 로그 교체
   if (data.logs && data.logs.length > 0) {
     logData.length = 0;
     data.logs.forEach(l => logData.push(l));
-    renderLogs();
+    if (page === 'log') renderLogs();
   }
 
   // 2) inbox 작업 목록 병합: 같은 논리 작업은 새 카드가 아니라 기존 카드 상태를 갱신
   if (data.tasks && data.tasks.length > 0) {
     data.tasks.forEach(serverTask => mergeTaskIntoStore(serverTask));
     dedupeTaskData();
-    renderTasks();
-    renderCalendarTaskOptions();
-    renderCalendar();
-    renderRequestProgress();
-    renderProjects();
-    renderReviews();
-    if (selectedTaskIdx >= 0) selectTask(selectedTaskIdx);
+    renderTaskUpdatesForPage(page, data);
     resumeAutoRefreshIfNeeded(5000);
   }
 
   if (Array.isArray(data.categories)) {
     categoryData = data.categories;
-    renderComposerCategoryOptions();
-    renderCalendarCategoryOptions();
-    refreshRequestPlan();
-    renderProjects();
+    if (page === 'request') {
+      renderComposerCategoryOptions();
+      refreshRequestPlan();
+    }
+    if (page === 'calendar') renderCalendarCategoryOptions();
+    if (page === 'projects') renderProjects();
   }
 
   if (data.calendar && Array.isArray(data.calendar.events)) {
     calendarData = data.calendar.events;
-    renderCalendar();
+    if (page === 'calendar') renderCalendar();
   }
 
   if (Array.isArray(data.meetings)) {
     meetingData = mergeMeetingData(meetingData, data.meetings);
-    renderMeetings(data.meetingKpis || {}, data.meetingSync || {});
+    if (page === 'meetings') renderMeetings(data.meetingKpis || {}, data.meetingSync || {});
   }
 
   // 3) 커버리지 데이터 교체 (problem / motivation)
@@ -9048,13 +9074,15 @@ function applyServerData(data) {
     if (cv.motivation) {
       _serverSlotContents = Object.assign(_serverSlotContents, cv.motivation.slotContents || {});
     }
-    updateCovKPIs();
-    renderCoverageTree();
+    if (page === 'coverage') {
+      updateCovKPIs();
+      renderCoverageTree();
+    }
   }
 
   // 4) 최근 활동 이력 교체
   if (data.activities && data.activities.length > 0) {
-    renderActivities(data.activities);
+    if (page === 'home') renderActivities(data.activities);
   }
 
   // 5) topbar KPI
@@ -9063,7 +9091,7 @@ function applyServerData(data) {
     if (el) el.textContent = data.kpis.coverage_pct || el.textContent;
   }
 
-  renderHomeOverview(data);
+  if (page === 'home') renderHomeOverview(data);
 }
 
 // 서버에서 받은 실제 문구 내용 캐시
@@ -14244,6 +14272,10 @@ function ensureFinalTranscriptArtifact(data) {
   }
 
   finalTranscriptState.artifact = { ...finalTranscriptState.artifact, ...artifact };
+  if (document.body.dataset.page === 'video' && finalTranscriptState.content && !finalTranscriptState.loading) {
+    updateFinalTranscriptHeader(data, finalTranscriptState.artifact);
+    return;
+  }
   renderFinalTranscriptReview(data);
 }
 
@@ -14319,16 +14351,19 @@ function renderFinalTranscriptReviewThread() {
   if (input) input.disabled = !artifact?.path;
 }
 
-function renderFinalTranscriptReview(data = latestVideoStatusData) {
+function updateFinalTranscriptHeader(data = latestVideoStatusData, artifact = finalTranscriptState.artifact || pickFinalTranscriptArtifact(data || {})) {
   const chip = document.getElementById('video-final-transcript-chip');
   const source = document.getElementById('video-final-transcript-source');
-  const artifact = finalTranscriptState.artifact || pickFinalTranscriptArtifact(data || {});
   if (chip) chip.textContent = finalTranscriptState.loading ? '읽는 중' : finalTranscriptCandidateLabel(artifact);
   if (source) {
     source.textContent = artifact?.path
       ? `${finalTranscriptCandidateLabel(artifact)} · ${artifact.title || artifact.kind || '전사록'} · ${artifact.path}`
       : '최종 전사록 산출물이 생성되면 자동으로 연결됩니다.';
   }
+}
+
+function renderFinalTranscriptReview(data = latestVideoStatusData) {
+  updateFinalTranscriptHeader(data);
   renderFinalTranscriptRows();
   renderFinalTranscriptReviewThread();
 }
