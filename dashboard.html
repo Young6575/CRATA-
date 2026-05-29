@@ -6296,6 +6296,193 @@ button.nav-item.active {
   background: rgba(255,255,255,0.012);
 }
 
+.video-artifact-inspector {
+  border: 1px solid rgba(var(--accent-rgb),0.28);
+  border-radius: var(--radius-md);
+  background: rgba(0,0,0,0.22);
+  overflow: hidden;
+}
+
+.video-artifact-inspector-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(var(--accent-rgb),0.055);
+}
+
+.video-artifact-title {
+  min-width: 0;
+  color: var(--text-white);
+  font-size: 12.5px;
+  font-weight: 850;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.video-artifact-path {
+  min-width: 0;
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.video-artifact-close {
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+.video-artifact-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(300px, .92fr);
+  height: min(62vh, 620px);
+  min-height: 360px;
+}
+
+.video-artifact-pane {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.video-artifact-pane + .video-artifact-pane {
+  border-left: 1px solid var(--border);
+}
+
+.video-artifact-pane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-white);
+  font-size: 11.5px;
+  font-weight: 850;
+}
+
+.video-artifact-pane-head span {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.video-artifact-pre,
+.video-artifact-change-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.video-artifact-pre {
+  margin: 0;
+  padding: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--text-hover);
+}
+
+.video-artifact-change-scroll {
+  padding: 10px;
+}
+
+.video-artifact-message {
+  padding: 22px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.video-change-list {
+  margin-top: 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.video-artifact-change-list {
+  margin-top: 0;
+}
+
+.video-change-card {
+  border: 1px solid rgba(59,130,246,0.22);
+  border-radius: var(--radius-sm);
+  background: rgba(59,130,246,0.045);
+  padding: 8px;
+}
+
+.video-change-card.compact {
+  padding: 7px;
+}
+
+.video-change-where {
+  margin-bottom: 5px;
+  color: var(--blue);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+
+.video-change-grid {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 20px minmax(0,1fr);
+  gap: 7px;
+  align-items: start;
+}
+
+.video-change-col {
+  color: var(--text-muted);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.video-change-col b {
+  color: var(--text);
+}
+
+.video-change-col.after {
+  color: var(--text-hover);
+}
+
+.video-change-col.after b {
+  color: var(--green);
+}
+
+.video-change-arrow {
+  color: var(--blue);
+  font-weight: 900;
+  text-align: center;
+}
+
+.video-change-reason,
+.video-change-more {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.video-change-reason {
+  margin-top: 6px;
+}
+
 @media (max-width: 1180px) {
   .video-transcript-review-body {
     grid-template-columns: 1fr;
@@ -6320,6 +6507,17 @@ button.nav-item.active {
   .video-transcript-speaker {
     justify-content: flex-start;
     width: fit-content;
+  }
+  .video-artifact-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  .video-artifact-pane {
+    min-height: 320px;
+  }
+  .video-artifact-pane + .video-artifact-pane {
+    border-left: 0;
+    border-top: 1px solid var(--border);
   }
 }
 
@@ -14197,31 +14395,34 @@ async function viewVideoArtifact(path, title, stepId) {
   renderVideoProcessFlow(latestVideoStatusData, totalCount, completedCount);
 }
 
-function renderVideoChanges(changes, limit = 10) {
+function renderVideoChanges(changes, limit = 10, options = {}) {
   const rawList = Array.isArray(changes) ? changes : (changes ? [changes] : []);
   const list = rawList.map(change => normalizeVideoChangeItem(change)).filter(Boolean);
   if (!list.length) return '';
   const maxItems = Math.max(1, Number(limit) || 10);
+  const rootClass = options.rootClass ? ` ${options.rootClass}` : '';
+  const cardClass = options.compact ? ' compact' : '';
+  const moreLabel = options.moreLabel || `외 ${list.length - maxItems}개 변경사항은 결과 파일에서 확인하세요.`;
   return `
-    <div style="margin-top:9px;display:flex;flex-direction:column;gap:6px;">
+    <div class="video-change-list${rootClass}">
       ${list.slice(0, maxItems).map(change => {
         const before = change.before ?? change.original ?? change.from ?? '';
         const after = change.after ?? change.revised ?? change.to ?? '';
         const reason = change.reason || change.note || '';
         const where = change.segment || change.time || change.index || '';
         return `
-          <div style="border:1px solid rgba(59,130,246,0.22);border-radius:var(--radius-sm);background:rgba(59,130,246,0.045);padding:8px;">
-            ${where ? `<div style="font-family:var(--font-mono);font-size:10.5px;color:var(--blue);margin-bottom:5px;">${escapeHtml(where)}</div>` : ''}
-            <div style="display:grid;grid-template-columns:minmax(0,1fr) 20px minmax(0,1fr);gap:7px;align-items:start;">
-              <div style="font-size:11.5px;color:var(--text-muted);line-height:1.45;"><b style="color:var(--text);">기존</b><br>${escapeHtml(before || '—')}</div>
-              <div style="color:var(--blue);font-weight:900;text-align:center;">→</div>
-              <div style="font-size:11.5px;color:var(--text-hover);line-height:1.45;"><b style="color:var(--green);">변경</b><br>${escapeHtml(after || '—')}</div>
+          <div class="video-change-card${cardClass}">
+            ${where ? `<div class="video-change-where">${escapeHtml(where)}</div>` : ''}
+            <div class="video-change-grid">
+              <div class="video-change-col"><b>기존</b><br>${escapeHtml(before || '—')}</div>
+              <div class="video-change-arrow">→</div>
+              <div class="video-change-col after"><b>변경</b><br>${escapeHtml(after || '—')}</div>
             </div>
-            ${reason ? `<div style="margin-top:6px;font-size:11px;color:var(--text-muted);line-height:1.4;">근거: ${escapeHtml(reason)}</div>` : ''}
+            ${reason ? `<div class="video-change-reason">근거: ${escapeHtml(reason)}</div>` : ''}
           </div>
         `;
       }).join('')}
-      ${list.length > maxItems ? `<div style="font-size:11px;color:var(--text-muted);">외 ${list.length - maxItems}개 변경사항은 결과 파일에서 확인하세요.</div>` : ''}
+      ${list.length > maxItems ? `<div class="video-change-more">${escapeHtml(moreLabel)}</div>` : ''}
     </div>
   `;
 }
@@ -14388,24 +14589,47 @@ function renderVideoArtifactChangeSummary(content, stepId, entry = {}) {
 function renderSelectedVideoArtifact(stepId) {
   if (!selectedVideoArtifact.path || selectedVideoArtifact.stepId !== stepId) return '';
   const artifactEntry = selectedVideoArtifact.loading || selectedVideoArtifact.error ? {} : selectedVideoArtifactEntry();
-  const changeSummary = selectedVideoArtifact.loading || selectedVideoArtifact.error
-    ? ''
-    : renderVideoArtifactChangeSummary(selectedVideoArtifact.content || '', selectedVideoArtifact.stepId, artifactEntry);
+  const changes = selectedVideoArtifact.loading || selectedVideoArtifact.error
+    ? []
+    : extractVideoArtifactChanges(selectedVideoArtifact.content || '', selectedVideoArtifact.stepId, artifactEntry);
+  const closeAction = "selectedVideoArtifact={stepId:'',path:'',title:'',content:'',loading:false,error:'',truncated:false}; renderVideoProcessFlow(latestVideoStatusData, Number(latestVideoStatusData.total_files ?? latestVideoStatusData.total ?? 0), Number(latestVideoStatusData.done ?? 0));";
   const body = selectedVideoArtifact.loading
-    ? '<div style="padding:18px;color:var(--text-muted);font-size:12px;">결과 파일을 읽는 중입니다.</div>'
+    ? '<div class="video-artifact-message">결과 파일을 읽는 중입니다.</div>'
     : selectedVideoArtifact.error
-      ? `<div style="padding:18px;color:var(--red);font-size:12px;">${escapeHtml(selectedVideoArtifact.error)}</div>`
-      : `<pre style="margin:0;max-height:360px;overflow:auto;white-space:pre-wrap;word-break:break-word;font-family:var(--font-mono);font-size:11.5px;line-height:1.55;color:var(--text-hover);">${escapeHtml(selectedVideoArtifact.content || '내용이 없습니다.')}</pre>${changeSummary}`;
-  return `
-    <div style="border:1px solid rgba(var(--accent-rgb),0.28);border-radius:var(--radius-md);background:rgba(0,0,0,0.2);overflow:hidden;">
-      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px 10px;border-bottom:1px solid var(--border);background:rgba(var(--accent-rgb),0.055);">
-        <div style="min-width:0;">
-          <div style="font-size:12px;font-weight:850;color:var(--text-white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(selectedVideoArtifact.title || '프로세스 결과')}</div>
-          <div style="font-size:10.5px;color:var(--text-muted);font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(selectedVideoArtifact.path)}</div>
+      ? `<div class="video-artifact-message" style="color:var(--red);">${escapeHtml(selectedVideoArtifact.error)}</div>`
+      : `
+        <div class="video-artifact-grid">
+          <section class="video-artifact-pane">
+            <div class="video-artifact-pane-head">
+              <strong>원문</strong>
+              <span>${selectedVideoArtifact.truncated ? '앞부분 표시' : `${String(selectedVideoArtifact.content || '').length.toLocaleString()} chars`}</span>
+            </div>
+            <pre class="video-artifact-pre">${escapeHtml(selectedVideoArtifact.content || '내용이 없습니다.')}</pre>
+          </section>
+          <section class="video-artifact-pane">
+            <div class="video-artifact-pane-head">
+              <strong>변경/검토 항목</strong>
+              <span>${changes.length} items</span>
+            </div>
+            <div class="video-artifact-change-scroll">
+              ${changes.length
+                ? renderVideoChanges(changes, 80, { rootClass: 'video-artifact-change-list', compact: true, moreLabel: `외 ${changes.length - 80}개 항목은 원문에서 확인하세요.` })
+                : '<div class="video-artifact-message">이 결과 파일에서 추출된 변경/검토 항목이 없습니다.</div>'}
+            </div>
+          </section>
         </div>
-        <button onclick="selectedVideoArtifact={stepId:'',path:'',title:'',content:'',loading:false,error:'',truncated:false}; renderVideoProcessFlow(latestVideoStatusData, Number(latestVideoStatusData.total_files ?? latestVideoStatusData.total ?? 0), Number(latestVideoStatusData.done ?? 0));" style="border:1px solid var(--border);background:var(--bg-input);color:var(--text-muted);border-radius:var(--radius-sm);padding:5px 8px;cursor:pointer;">닫기</button>
+        ${selectedVideoArtifact.truncated ? '<div class="video-artifact-message" style="padding-top:10px;color:var(--yellow);">파일이 커서 앞부분만 표시했습니다.</div>' : ''}
+      `;
+  return `
+    <div class="video-artifact-inspector">
+      <div class="video-artifact-inspector-head">
+        <div style="min-width:0;">
+          <div class="video-artifact-title">${escapeHtml(selectedVideoArtifact.title || '프로세스 결과')}</div>
+          <div class="video-artifact-path">${escapeHtml(selectedVideoArtifact.path)}</div>
+        </div>
+        <button class="video-artifact-close" onclick="${closeAction}">닫기</button>
       </div>
-      <div style="padding:10px;">${body}${selectedVideoArtifact.truncated ? '<div style="margin-top:8px;color:var(--yellow);font-size:11px;">파일이 커서 앞부분만 표시했습니다.</div>' : ''}</div>
+      ${body}
     </div>
   `;
 }
@@ -14429,7 +14653,7 @@ function renderVideoProcessResult(data, steps, selectedId) {
     const isVideo = /\.(mp4|mov|mkv|avi|webm|m4v|mxf)$/i.test(path);
     const previewBtn = isVideo && path ? `<button onclick="previewDesktopVideo('${escapeHtml(escapeJs(path))}')" style="padding:5px 8px;border-radius:var(--radius-sm);border:1px solid rgba(59,130,246,0.32);background:rgba(59,130,246,0.12);color:#bfdbfe;font-size:11px;font-weight:800;cursor:pointer;">미리보기</button>` : '';
     const viewBtn = !isVideo && path && videoArtifactIsText(path) ? `<button onclick="viewVideoArtifact('${escapeHtml(escapeJs(path))}','${escapeHtml(escapeJs(title))}','${escapeHtml(escapeJs(step.id))}')" style="padding:5px 8px;border-radius:var(--radius-sm);border:1px solid rgba(16,185,129,0.32);background:rgba(16,185,129,0.12);color:#bbf7d0;font-size:11px;font-weight:800;cursor:pointer;">보기</button>` : '';
-    const changesHtml = renderVideoChanges(item.changes || item.diff || item.revisions || item.corrections || item.speaker_changes || item.term_changes, 8);
+    const changesHtml = renderVideoChanges(item.changes || item.diff || item.revisions || item.corrections || item.speaker_changes || item.term_changes, 3, { compact: true, moreLabel: '전체 항목은 보기에서 확인하세요.' });
     return `
       <div style="padding:9px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:rgba(255,255,255,0.015);">
         <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;">
