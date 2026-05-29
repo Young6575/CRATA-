@@ -2218,8 +2218,11 @@ def build_claude_prompt(task):
 
 
 def task_requests_plaud(task):
+    if str(task.get('type') or '').startswith('plaud_'):
+        return True
+
     text = f"{task.get('title', '')}\n{task.get('desc', '')}"
-    if re.search(r'금지|하지\s*말|하지마|제외|skip|스킵', text, re.IGNORECASE):
+    if re.search(r'금지|하지\s*말|하지\s*마|제외|skip|스킵', text, re.IGNORECASE):
         return False
     return bool(re.search(
         r'plaud|recording|transcript|(녹음|전사).{0,24}(처리|읽|확인|조회|요약|분석|가져)',
