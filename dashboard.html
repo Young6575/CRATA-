@@ -8570,14 +8570,66 @@ function fetchWithTimeout(url, options = {}, timeoutMs = 3000) {
     .finally(() => clearTimeout(timer));
 }
 
+const SCROLL_RESTORE_SELECTORS = [
+  '#meeting-list',
+  '#meeting-detail .meeting-tab-panel',
+  '#task-request-list',
+  '#task-items-container',
+  '#task-detail-header',
+  '#task-detail-collab',
+  '#request-thread-list',
+  '#cov-tree-container',
+  '#cov-detail-panel',
+  '#video-process-result-panel',
+];
+
+function captureDashboardScrollState() {
+  const state = [];
+  const pageScroller = document.scrollingElement || document.documentElement;
+  if (pageScroller) {
+    state.push({ selector: '__page__', top: pageScroller.scrollTop, left: pageScroller.scrollLeft });
+  }
+  SCROLL_RESTORE_SELECTORS.forEach(selector => {
+    document.querySelectorAll(selector).forEach((el, index) => {
+      state.push({ selector, index, top: el.scrollTop || 0, left: el.scrollLeft || 0 });
+    });
+  });
+  return state;
+}
+
+function restoreElementScroll(el, top = 0, left = 0) {
+  if (!el) return;
+  const maxTop = Math.max(0, el.scrollHeight - el.clientHeight);
+  const maxLeft = Math.max(0, el.scrollWidth - el.clientWidth);
+  el.scrollTop = Math.min(Math.max(top, 0), maxTop);
+  el.scrollLeft = Math.min(Math.max(left, 0), maxLeft);
+}
+
+function restoreDashboardScrollState(state = []) {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      state.forEach(item => {
+        if (item.selector === '__page__') {
+          restoreElementScroll(document.scrollingElement || document.documentElement, item.top, item.left);
+          return;
+        }
+        const el = document.querySelectorAll(item.selector)[item.index || 0];
+        restoreElementScroll(el, item.top, item.left);
+      });
+    });
+  });
+}
+
 // ── 실제 데이터 Fetch ────────────────────────────────────────────────
 async function fetchRealData() {
   try {
     const res  = await fetchWithTimeout(`${SERVER_URL}/api/data`, {}, 3000);
     if (!res.ok) throw new Error('Server error');
     const data = await res.json();
+    const scrollState = captureDashboardScrollState();
     setServerStatus(true);
     applyServerData(data);
+    restoreDashboardScrollState(scrollState);
   } catch (e) {
     setServerStatus(false);
     // 오프라인 모드: mock 데이터 그대로 사용
