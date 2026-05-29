@@ -8405,7 +8405,7 @@ async function runSystemUpdate() {
     } else {
       const localNote = result.local_changes_autostashed ? ' 로컬 수정은 유지했습니다.' : '';
       showToast(`업데이트 ${changedCount}개 적용됨.${localNote}`, 'success');
-      fetchRealData();
+      fetchRealData().then(() => resumeAutoRefreshIfNeeded(0));
     }
   } catch (error) {
     showToast('업데이트 중 오류가 발생했습니다.', 'warning');
@@ -8636,6 +8636,71 @@ async function fetchRealData() {
   }
 }
 
+let autoRefreshTimer = null;
+let autoRefreshRunning = false;
+
+function isMeetingTranscriptOpen() {
+  return document.body.dataset.page === 'meetings' && activeMeetingDetailTab === 'transcript';
+}
+
+function hasActiveDashboardWork() {
+  return taskData.some(t => ['active', 'pending'].includes(t.status));
+}
+
+function clearAutoRefreshTimer() {
+  if (autoRefreshTimer) {
+    clearTimeout(autoRefreshTimer);
+    autoRefreshTimer = null;
+  }
+}
+
+function scheduleAutoRefresh(delayMs = 5000) {
+  clearAutoRefreshTimer();
+  autoRefreshTimer = setTimeout(runAutoRefresh, delayMs);
+}
+
+async function runAutoRefresh() {
+  clearAutoRefreshTimer();
+  if (autoRefreshRunning) return;
+
+  if (isMeetingTranscriptOpen()) {
+    return;
+  }
+
+  if (!hasActiveDashboardWork()) {
+    return;
+  }
+
+  autoRefreshRunning = true;
+  try {
+    await fetchRealData();
+  } finally {
+    autoRefreshRunning = false;
+  }
+
+  if (!isMeetingTranscriptOpen() && hasActiveDashboardWork()) {
+    scheduleAutoRefresh(5000);
+  }
+}
+
+function resumeAutoRefreshIfNeeded(delayMs = 0) {
+  if (!isMeetingTranscriptOpen() && hasActiveDashboardWork()) {
+    scheduleAutoRefresh(delayMs);
+  } else if (isMeetingTranscriptOpen()) {
+    clearAutoRefreshTimer();
+  }
+}
+
+function refreshAfterMutation(delayMs = 1000) {
+  setTimeout(() => {
+    if (isMeetingTranscriptOpen()) {
+      clearAutoRefreshTimer();
+      return;
+    }
+    fetchRealData().then(() => resumeAutoRefreshIfNeeded(0));
+  }, delayMs);
+}
+
 function normalizeTaskIdentityText(value) {
   return String(value ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
 }
@@ -8746,6 +8811,7 @@ function applyServerData(data) {
     renderProjects();
     renderReviews();
     if (selectedTaskIdx >= 0) selectTask(selectedTaskIdx);
+    resumeAutoRefreshIfNeeded(5000);
   }
 
   if (Array.isArray(data.categories)) {
@@ -9183,7 +9249,7 @@ async function saveCalendarEvent(eventOverride = null) {
     showToast('서버 연결이 없어 화면에만 임시 저장했습니다.', 'info');
   }
   renderCalendar();
-  setTimeout(fetchRealData, 800);
+  refreshAfterMutation(800);
 }
 
 async function deleteCalendarEvent(eventId = '') {
@@ -10076,6 +10142,11 @@ function setMeetingDetailTab(tab) {
       loadMeetingTranscript(meeting.id);
     }
   }
+  if (activeMeetingDetailTab === 'transcript') {
+    clearAutoRefreshTimer();
+  } else {
+    resumeAutoRefreshIfNeeded(0);
+  }
 }
 
 async function loadMeetingTranscript(meetingId) {
@@ -10172,6 +10243,7 @@ function selectMeeting(idx) {
   selectedMeetingIdx = idx;
   activeMeetingDetailTab = 'summary';
   renderMeetings();
+  resumeAutoRefreshIfNeeded(0);
 }
 
 function renderMeetingDetail(meeting) {
@@ -10299,7 +10371,7 @@ async function syncMeetings() {
     }
     const total = saved.meetings?.kpis?.total ?? meetingData.length;
     showToast(saved.message || `PLAUD 회의록 ${total}건으로 갱신했습니다.`, 'success');
-    fetchRealData();
+    refreshAfterMutation(0);
   } else {
     if (saved?.meetings) {
       meetingData = mergeMeetingData(meetingData, saved.meetings.meetings || meetingData);
@@ -10324,7 +10396,7 @@ async function processMeeting(meetingId) {
       meetingData = mergeMeetingData(meetingData, saved.meetings.meetings || meetingData);
       renderMeetings(saved.meetings.kpis || {}, saved.meetings);
     }
-    setTimeout(fetchRealData, 1000);
+    refreshAfterMutation(1000);
   } else {
     showToast(saved?.error || '회의록 처리 작업 등록에 실패했습니다.', 'warning');
   }
@@ -10351,9 +10423,6 @@ async function postToServer(endpoint, payload, timeoutMs = 10000) {
     }
   }
 }
-
-// ── 작업 실행 상태 자동 갱신 ─────────────────────────────────────────
-setInterval(fetchRealData, 5000);
 
 // --- Helper: Toast Notification ---
 function showToast(message, type = 'success') {
@@ -10973,8 +11042,8 @@ document.addEventListener('DOMContentLoaded', () => {
   renderCalendar();
   renderProjects();
 
-  // 서버 실제 데이터 연결 (비동기)
-  fetchRealData();
+  // 서버 실제 데이터 연결 (초기 1회). 이후에는 진행 중 작업이 있을 때만 자동 갱신한다.
+  fetchRealData().then(() => resumeAutoRefreshIfNeeded(5000));
   
   // Set up command palette filter events
   document.getElementById('cmd-input').addEventListener('input', filterCmdItems);
@@ -11039,6 +11108,11 @@ function nav(id, el) {
   }
   if (id === 'meetings') {
     renderMeetings();
+    if (activeMeetingDetailTab === 'transcript') {
+      clearAutoRefreshTimer();
+    }
+  } else {
+    resumeAutoRefreshIfNeeded(0);
   }
   if (id === 'review') {
     renderReviews();
@@ -12148,7 +12222,7 @@ async function submitFollowupRequest(parentTask) {
   renderTasks();
   renderRequestProgress();
   showToast('후속 요청을 대화에 추가했습니다.', saved && saved.ok ? 'success' : 'info');
-  setTimeout(fetchRealData, 1000);
+  refreshAfterMutation(1000);
 }
 
 async function submitRequestPlan() {
@@ -12198,7 +12272,7 @@ async function submitRequestPlan() {
   refreshRequestPlan(true);
   renderRequestProgress();
   showToast(`${registered}개 업무를 실행 대기열에 등록했습니다.`, 'success');
-  setTimeout(fetchRealData, 1000);
+  refreshAfterMutation(1000);
 }
 
 async function submitTask() {
@@ -12260,7 +12334,7 @@ async function submitTask() {
   if (saved && saved.ok) {
     Object.assign(newT, saved.task);
     showToast(`✓ AI 실행 대기열에 등록되었습니다. ${agentData[targetAgent].name} 배정.`, 'success');
-    setTimeout(fetchRealData, 1000);
+    refreshAfterMutation(1000);
   } else {
     showToast(`${agentData[targetAgent].name}에게 지시 사항이 전달되었습니다. (오프라인 — 서버 미연결)`, 'info');
   }
@@ -14085,7 +14159,7 @@ async function submitVideoTranscriptReviewNote() {
     saveFinalTranscriptMessages();
     renderFinalTranscriptReviewThread();
     showToast('전사록 수정 요청을 등록했습니다.', 'success');
-    setTimeout(fetchRealData, 1000);
+    refreshAfterMutation(1000);
   } catch (error) {
     finalTranscriptState.messages.push({
       role: 'assistant',
@@ -14725,7 +14799,7 @@ async function cancelVideoEncoding() {
       message: '사용자 요청으로 영상 작업을 중지했습니다.',
     });
     showToast('영상 작업을 중지했습니다.', 'success');
-    setTimeout(fetchRealData, 1000);
+    refreshAfterMutation(1000);
   } catch (error) {
     showToast(error.message || '영상 작업 중지 중 오류가 발생했습니다.', 'warning');
   } finally {
@@ -14794,7 +14868,7 @@ async function startVideoEncoding() {
       speaker_count: speakerCount,
     });
     showToast('영상 인코딩 작업을 등록했습니다. 작업 지시서에서 진행 상황을 확인하세요.', 'success');
-    setTimeout(fetchRealData, 1000);
+    refreshAfterMutation(1000);
   } catch (error) {
     showToast(error.message || '영상 인코딩 작업 등록 중 오류가 발생했습니다.', 'warning');
   } finally {
