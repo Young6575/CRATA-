@@ -2898,6 +2898,104 @@ def plaud_tool_text_payload(result):
     raise RuntimeError(f'Plaud MCP 응답 JSON 파싱 실패: {sample or "텍스트 payload 없음"}')
 
 
+def format_transcript_time(value):
+    try:
+        milliseconds = int(float(value))
+    except Exception:
+        return ''
+    total_seconds = max(milliseconds // 1000, 0)
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    seconds = total_seconds % 60
+    if hours:
+        return f'{hours:02d}:{minutes:02d}:{seconds:02d}'
+    return f'{minutes:02d}:{seconds:02d}'
+
+
+def collect_transcript_segments(value):
+    segments = []
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return []
+        try:
+            return collect_transcript_segments(json.loads(text))
+        except Exception:
+            return [{'content': text}]
+
+    if isinstance(value, dict):
+        if isinstance(value.get('data_content'), str):
+            segments.extend(collect_transcript_segments(value.get('data_content')))
+        for key in ('source_list', 'transcript', 'transcripts', 'segments', 'items', 'data'):
+            if key in value:
+                segments.extend(collect_transcript_segments(value.get(key)))
+        if value.get('content') or value.get('text'):
+            segments.append(value)
+        return segments
+
+    if isinstance(value, list):
+        for item in value:
+            segments.extend(collect_transcript_segments(item))
+    return segments
+
+
+def transcript_segments_to_text(segments):
+    lines = []
+    for segment in segments:
+        content = str(segment.get('content') or segment.get('text') or '').strip()
+        if not content:
+            continue
+        time_label = format_transcript_time(segment.get('start_time') or segment.get('start') or segment.get('start_ms') or 0)
+        speaker = str(segment.get('speaker') or segment.get('original_speaker') or '').strip()
+        prefix_parts = []
+        if time_label:
+            prefix_parts.append(time_label)
+        if speaker:
+            prefix_parts.append(speaker)
+        prefix = f"[{' | '.join(prefix_parts)}] " if prefix_parts else ''
+        lines.append(f'{prefix}{content}')
+    return '\n\n'.join(lines).strip()
+
+
+def fetch_and_store_meeting_transcript(meeting_id):
+    state = read_meetings_state()
+    meeting = next((m for m in state.get('meetings', []) if m.get('id') == meeting_id), {})
+    result = call_plaud_mcp_tool('get_transcript', {'file_id': meeting_id}, timeout=120)
+    payload = plaud_tool_text_payload(result)
+    segments = collect_transcript_segments(payload)
+    text = transcript_segments_to_text(segments)
+    if not text:
+        raise RuntimeError('Plaud 전사록 응답에 표시할 본문이 없습니다.')
+
+    transcript_path = transcript_file_for(meeting_id)
+    if not transcript_path:
+        raise RuntimeError('전사록 저장 경로를 만들 수 없습니다.')
+    transcript_path.parent.mkdir(parents=True, exist_ok=True)
+    transcript_path.write_text(text, encoding='utf-8')
+
+    display = display_path(transcript_path)
+    saved_at = now_iso()
+    update_meeting_cache(meeting_id, {
+        'title': meeting.get('title') or meeting_id,
+        'recorded_at': meeting.get('recorded_at', ''),
+        'created_at': meeting.get('created_at', ''),
+        'duration': meeting.get('duration', 0),
+        'transcript_path': display,
+        'transcript_chars': len(text),
+        'transcript_saved_at': saved_at,
+        'transcript_preview': text[:700],
+    })
+
+    return {
+        'ok': True,
+        'id': meeting_id,
+        'transcript': text,
+        'chars': len(text),
+        'path': display,
+        'saved_at': saved_at,
+    }
+
+
 def fetch_plaud_recordings_from_mcp():
     all_items = []
     seen = set()
@@ -3097,7 +3195,10 @@ def read_meeting_transcript(meeting_id):
                 'saved_at': meeting.get('transcript_saved_at') or meeting.get('last_action_at', ''),
             }
 
-    return {'ok': False, 'id': meeting_id, 'error': 'transcript not found', 'transcript': ''}
+    try:
+        return fetch_and_store_meeting_transcript(meeting_id)
+    except Exception as exc:
+        return {'ok': False, 'id': meeting_id, 'error': str(exc), 'transcript': ''}
 
 
 def meeting_snapshot():

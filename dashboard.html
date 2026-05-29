@@ -9949,7 +9949,7 @@ async function loadMeetingTranscript(meetingId) {
   meetingTranscriptLoadingId = meetingId;
   const idx = meetingData.findIndex(m => String(m.id) === String(meetingId));
   try {
-    const res = await fetchWithTimeout(`${SERVER_URL}/api/meetings/transcript?id=${encodeURIComponent(meetingId)}`, {}, 5000);
+    const res = await fetchWithTimeout(`${SERVER_URL}/api/meetings/transcript?id=${encodeURIComponent(meetingId)}`, {}, 30000);
     if (res && res.ok) {
       const data = await res.json();
       if (data && data.ok && idx >= 0) {
@@ -10099,7 +10099,7 @@ function renderMeetingDetail(meeting) {
     <div class="meeting-empty-state">
       <div>
         <div style="color:var(--text-hover);font-weight:800;margin-bottom:8px;">전사록을 불러오는 중입니다.</div>
-        <div>저장된 전사록 파일 또는 회의록 캐시를 확인하고 있습니다.</div>
+        <div>저장된 파일이 없으면 PLAUD에서 전사록을 가져와 저장하고 있습니다.</div>
       </div>
     </div>
   ` : meeting.transcript_load_error ? `
@@ -10113,7 +10113,7 @@ function renderMeetingDetail(meeting) {
     <div class="meeting-empty-state">
       <div>
         <div style="color:var(--text-hover);font-weight:800;margin-bottom:8px;">저장된 전사록이 아직 없습니다.</div>
-        <div>업무로 나누기 처리 시 전사록 파일이 저장되면 이 탭에서 전체 내용을 볼 수 있습니다.<br>현재는 PLAUD 목록 캐시와 처리 요약만 연결된 상태입니다.</div>
+        <div>전사록 탭을 열면 PLAUD에서 전체 전사록을 가져와 저장한 뒤 표시합니다.</div>
       </div>
     </div>
   `;
