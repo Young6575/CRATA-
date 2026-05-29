@@ -2864,10 +2864,38 @@ def call_plaud_mcp_tool(tool_name, arguments=None, timeout=60):
 
 
 def plaud_tool_text_payload(result):
+    if result.get('isError'):
+        text = ' / '.join(
+            (item.get('text') or '').strip()
+            for item in result.get('content') or []
+            if item.get('type') == 'text' and item.get('text')
+        )
+        raise RuntimeError(f'Plaud MCP 오류 응답: {text[:500] or "내용 없음"}')
+
+    text_values = []
     for item in result.get('content') or []:
         if item.get('type') == 'text' and item.get('text'):
-            return json.loads(item['text'])
-    raise RuntimeError('Plaud MCP 응답에 텍스트 payload가 없습니다.')
+            text = item['text'].strip()
+            if not text:
+                continue
+            text_values.append(text)
+            candidates = [text]
+            fenced = re.search(r'```(?:json)?\s*(.*?)```', text, re.DOTALL | re.IGNORECASE)
+            if fenced:
+                candidates.append(fenced.group(1).strip())
+            for opener, closer in (('{', '}'), ('[', ']')):
+                start = text.find(opener)
+                end = text.rfind(closer)
+                if start >= 0 and end > start:
+                    candidates.append(text[start:end + 1])
+            for candidate in candidates:
+                try:
+                    return json.loads(candidate)
+                except json.JSONDecodeError:
+                    continue
+
+    sample = ' / '.join(text_values)[:500]
+    raise RuntimeError(f'Plaud MCP 응답 JSON 파싱 실패: {sample or "텍스트 payload 없음"}')
 
 
 def fetch_plaud_recordings_from_mcp():
