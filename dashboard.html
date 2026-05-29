@@ -6368,10 +6368,10 @@ button.nav-item.active {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 9px 12px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border);
   color: var(--text-white);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 850;
 }
 
@@ -6392,17 +6392,17 @@ button.nav-item.active {
 
 .video-artifact-pre {
   margin: 0;
-  padding: 12px;
+  padding: 14px;
   white-space: pre-wrap;
   word-break: break-word;
   font-family: var(--font-mono);
-  font-size: 11.5px;
-  line-height: 1.55;
+  font-size: 13.5px;
+  line-height: 1.68;
   color: var(--text-hover);
 }
 
 .video-artifact-change-scroll {
-  padding: 10px;
+  padding: 12px;
 }
 
 .video-artifact-message {
@@ -6438,7 +6438,7 @@ button.nav-item.active {
   margin-bottom: 5px;
   color: var(--blue);
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 11.5px;
 }
 
 .video-change-grid {
@@ -6450,8 +6450,8 @@ button.nav-item.active {
 
 .video-change-col {
   color: var(--text-muted);
-  font-size: 11.5px;
-  line-height: 1.45;
+  font-size: 13px;
+  line-height: 1.58;
 }
 
 .video-change-col b {
@@ -6475,8 +6475,8 @@ button.nav-item.active {
 .video-change-reason,
 .video-change-more {
   color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.4;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .video-change-reason {
@@ -6957,6 +6957,7 @@ body:not([data-page="home"]) .cov-slot-sel {
 }
 #page-video .g2 {
   gap: 18px !important;
+  grid-template-columns: minmax(260px, 0.62fr) minmax(0, 1.38fr);
 }
 
 /* ===== COLOR RESTRAINT PASS ===== */
@@ -13829,6 +13830,17 @@ const VIDEO_PROCESS_ALIASES = {
 let selectedVideoProcessId = '';
 let latestVideoStatusData = {};
 let selectedVideoArtifact = { stepId: '', path: '', title: '', content: '', loading: false, error: '', truncated: false };
+
+function emptySelectedVideoArtifact() {
+  return { stepId: '', path: '', title: '', content: '', loading: false, error: '', truncated: false };
+}
+
+function isVideoArtifactInspectorOpen() {
+  return document.body.dataset.page === 'video'
+    && Boolean(selectedVideoArtifact.path)
+    && selectedVideoArtifact.stepId === selectedVideoProcessId;
+}
+
 let finalTranscriptState = {
   artifact: null,
   content: '',
@@ -13895,6 +13907,9 @@ function processStateLabel(state) {
 
 function selectVideoProcess(id) {
   selectedVideoProcessId = normalizeVideoProcessId(id);
+  if (selectedVideoArtifact.stepId && selectedVideoArtifact.stepId !== selectedVideoProcessId) {
+    selectedVideoArtifact = emptySelectedVideoArtifact();
+  }
   const completedFiles = Array.isArray(latestVideoStatusData.completed_files) ? latestVideoStatusData.completed_files : (Array.isArray(latestVideoStatusData.completed) ? latestVideoStatusData.completed : []);
   const completedCount = Number.isFinite(Number(latestVideoStatusData.done)) ? Number(latestVideoStatusData.done) : completedFiles.length;
   const totalCount = Number(latestVideoStatusData.total_files ?? latestVideoStatusData.total ?? 0);
@@ -14687,7 +14702,7 @@ function renderVideoProcessResult(data, steps, selectedId) {
   `;
 }
 
-function renderVideoProcessFlow(data, totalCount, completedCount) {
+function renderVideoProcessFlow(data, totalCount, completedCount, options = {}) {
   const flow = document.getElementById('video-process-flow');
   const titleEl = document.getElementById('video-process-title');
   const chip = document.getElementById('video-process-progress-chip');
@@ -14775,7 +14790,9 @@ function renderVideoProcessFlow(data, totalCount, completedCount) {
       </div>
     `;
   }).join('');
-  renderVideoProcessResult(data || {}, steps, selectedVideoProcessId);
+  if (!options.preserveResultPanel) {
+    renderVideoProcessResult(data || {}, steps, selectedVideoProcessId);
+  }
 }
 
 function metricValue(value, suffix = '%') {
@@ -14957,7 +14974,9 @@ function updateVideoUI(data) {
     if (elapsedLbl) elapsedLbl.textContent = '대기 중';
   }
   
-  renderVideoProcessFlow(data, totalCount, completedCount);
+  renderVideoProcessFlow(data, totalCount, completedCount, {
+    preserveResultPanel: isVideoArtifactInspectorOpen(),
+  });
   renderVideoSystemMetrics(data);
   renderVideoModelStatus(data);
   ensureFinalTranscriptArtifact(data);
