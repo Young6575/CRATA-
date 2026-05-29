@@ -4,7 +4,7 @@
 브라우저: http://localhost:8765
 """
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
-import json, re, glob, pathlib, mimetypes, os, shutil, socket, subprocess, tempfile, threading, time, uuid
+import json, re, glob, pathlib, mimetypes, os, shutil, socket, subprocess, tempfile, threading, time, uuid, queue
 import sys
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qs, quote
@@ -2775,6 +2775,232 @@ def update_meeting_cache(meeting_id, fields):
     return cache
 
 
+def send_mcp_message(proc, payload):
+    proc.stdin.write(json.dumps(payload, ensure_ascii=False) + '\n')
+    proc.stdin.flush()
+
+
+def wait_mcp_response(message_queue, request_id, timeout=30):
+    deadline = time.time() + timeout
+    stderr_lines = []
+    while time.time() < deadline:
+        try:
+            source, line = message_queue.get(timeout=min(0.25, max(deadline - time.time(), 0.01)))
+        except queue.Empty:
+            continue
+
+        if source == 'stderr':
+            if line:
+                stderr_lines.append(line)
+            continue
+
+        try:
+            message = json.loads(line)
+        except Exception:
+            continue
+        if message.get('id') == request_id:
+            return message
+
+    detail = stderr_lines[-1] if stderr_lines else '응답 시간 초과'
+    raise RuntimeError(f'Plaud MCP 응답을 받지 못했습니다: {detail}')
+
+
+def call_plaud_mcp_tool(tool_name, arguments=None, timeout=60):
+    message_queue = queue.Queue()
+    proc = subprocess.Popen(
+        [resolve_npx_command(), '-y', '@plaud-ai/mcp@latest'],
+        cwd=str(ROOT),
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding='utf-8',
+        errors='replace',
+        bufsize=1,
+    )
+
+    def read_stream(stream, source):
+        for line in stream:
+            message_queue.put((source, line.rstrip('\n')))
+
+    threading.Thread(target=read_stream, args=(proc.stdout, 'stdout'), daemon=True).start()
+    threading.Thread(target=read_stream, args=(proc.stderr, 'stderr'), daemon=True).start()
+
+    try:
+        send_mcp_message(proc, {
+            'jsonrpc': '2.0',
+            'id': 1,
+            'method': 'initialize',
+            'params': {
+                'protocolVersion': '2025-06-18',
+                'capabilities': {},
+                'clientInfo': {'name': 'crata-dashboard', 'version': '1.0'},
+            },
+        })
+        init_response = wait_mcp_response(message_queue, 1, timeout=20)
+        if init_response.get('error'):
+            raise RuntimeError(init_response['error'].get('message') or 'Plaud MCP 초기화 실패')
+
+        send_mcp_message(proc, {'jsonrpc': '2.0', 'method': 'notifications/initialized', 'params': {}})
+        send_mcp_message(proc, {
+            'jsonrpc': '2.0',
+            'id': 2,
+            'method': 'tools/call',
+            'params': {'name': tool_name, 'arguments': arguments or {}},
+        })
+        response = wait_mcp_response(message_queue, 2, timeout=timeout)
+        if response.get('error'):
+            raise RuntimeError(response['error'].get('message') or f'Plaud MCP {tool_name} 호출 실패')
+        return response.get('result') or {}
+    finally:
+        try:
+            proc.terminate()
+            proc.wait(timeout=3)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+
+
+def plaud_tool_text_payload(result):
+    for item in result.get('content') or []:
+        if item.get('type') == 'text' and item.get('text'):
+            return json.loads(item['text'])
+    raise RuntimeError('Plaud MCP 응답에 텍스트 payload가 없습니다.')
+
+
+def fetch_plaud_recordings_from_mcp():
+    all_items = []
+    seen = set()
+    page_size = 100
+    for page in range(1, 6):
+        result = call_plaud_mcp_tool('list_files', {'page': page, 'page_size': page_size}, timeout=75)
+        payload = plaud_tool_text_payload(result)
+        items = payload.get('data') if isinstance(payload, dict) else []
+        if not isinstance(items, list):
+            raise RuntimeError('Plaud MCP list_files 응답 형식이 올바르지 않습니다.')
+        for item in items:
+            meeting_id = item.get('id')
+            if meeting_id and meeting_id not in seen:
+                seen.add(meeting_id)
+                all_items.append(item)
+        if len(items) < page_size:
+            break
+    return all_items
+
+
+def sync_plaud_meetings_direct():
+    processed = read_processed_recordings()
+    cache = read_json_file(MEETINGS_FILE, {'meetings': []})
+    existing_by_id = {
+        item.get('id'): item
+        for item in cache.get('meetings', [])
+        if isinstance(item, dict) and item.get('id')
+    }
+    preserved_keys = (
+        'summary',
+        'task_count',
+        'last_action_at',
+        'transcript_path',
+        'transcript_chars',
+        'transcript_saved_at',
+        'transcript_preview',
+    )
+    meetings = []
+    for item in fetch_plaud_recordings_from_mcp():
+        meeting_id = item.get('id')
+        if not meeting_id:
+            continue
+        existing = existing_by_id.get(meeting_id, {})
+        meeting = {
+            'id': meeting_id,
+            'title': item.get('name') or item.get('title') or existing.get('title') or meeting_id,
+            'recorded_at': item.get('start_at') or item.get('recorded_at') or existing.get('recorded_at') or '',
+            'created_at': item.get('created_at') or existing.get('created_at') or '',
+            'duration': item.get('duration') or existing.get('duration') or 0,
+            'status': 'processed' if meeting_id in processed else existing.get('status', 'unprocessed'),
+        }
+        for key in preserved_keys:
+            if existing.get(key):
+                meeting[key] = existing[key]
+        meetings.append(meeting)
+
+    write_json_file(MEETINGS_FILE, {
+        'updated_at': now_iso(),
+        'sync_status': 'done',
+        'sync_requested_at': cache.get('sync_requested_at', ''),
+        'meetings': meetings,
+    })
+    return read_meetings_state()
+
+
+def mark_meeting_sync_error(error):
+    cache = read_json_file(MEETINGS_FILE, {'meetings': []})
+    cache['updated_at'] = now_iso()
+    cache['sync_status'] = 'error'
+    cache['sync_error'] = str(error)
+    cache.setdefault('meetings', [])
+    write_json_file(MEETINGS_FILE, cache)
+    return read_meetings_state()
+
+
+def run_meeting_sync_task(fpath):
+    if task_is_cancelled(fpath):
+        return
+
+    update_task_file(fpath, lambda t: (
+        t.update({
+            'status': 'active',
+            'statusLbl': '진행 중',
+            'progress': 20,
+            'started_at': now_iso(),
+            'runner': {
+                'active': 'server',
+                'primary': 'server',
+                'fallback': None,
+                'command': resolve_npx_command(),
+                'mode': 'direct Plaud MCP list_files',
+            },
+            'error': '',
+            'result': '서버가 Plaud MCP list_files로 회의록 목록을 갱신하고 있습니다.',
+        }),
+        append_task_log(t, '시스템', '서버 직접 Plaud MCP 동기화를 시작했습니다.')
+    ))
+
+    try:
+        sync_plaud_meetings_direct()
+        update_task_file(fpath, lambda t: (
+            t.update({
+                'status': 'done',
+                'statusLbl': '완료됨',
+                'progress': 100,
+                'completed_at': now_iso(),
+            }),
+            enrich_task_result(t, '서버가 Plaud MCP list_files를 직접 호출해 목록 캐시를 갱신했습니다.'),
+            append_task_log(t, '시스템', 'Plaud 회의록 목록 동기화가 완료되었습니다.')
+        ))
+    except Exception as exc:
+        mark_meeting_sync_error(exc)
+        update_task_file(fpath, lambda t: (
+            t.update({
+                'status': 'error',
+                'statusLbl': '실패',
+                'progress': 100,
+                'error': f'PLAUD 목록 동기화 실패: {exc}',
+                'completed_at': now_iso(),
+            }),
+            enrich_task_result(t, f'서버 직접 Plaud MCP 동기화 실패: {exc}'),
+            append_task_log(t, '시스템', 'Plaud 회의록 목록 동기화에 실패했습니다.')
+        ))
+
+
+def start_meeting_sync_worker(fpath):
+    thread = threading.Thread(target=run_meeting_sync_task, args=(pathlib.Path(fpath),), daemon=True)
+    thread.start()
+    return thread
+
+
 def transcript_file_for(meeting_id):
     safe_id = re.sub(r'[^0-9A-Za-z_.-]+', '_', str(meeting_id or '').strip())
     if not safe_id:
@@ -2988,7 +3214,7 @@ def create_meeting_sync_task(data):
 4. 이 단계에서는 전사록 전체를 읽지 말고 목록만 업데이트하세요.
 5. 오류가 있으면 sync_status를 "error"로 두고 대시보드 결과에 원인을 간단히 남기세요.
 """
-    task, _ = save_task_request({
+    task, fpath = save_task_request({
         'title': 'PLAUD 회의록 목록 업데이트',
         'desc': desc,
         'type': 'plaud_sync',
@@ -3003,7 +3229,8 @@ def create_meeting_sync_task(data):
         'assignments': [
             {'name': '기획담당', 'role': 'PLAUD 목록 동기화', 'progress': 0, 'status': 'pending'},
         ],
-    }, start=True)
+    }, start=False)
+    start_meeting_sync_worker(fpath)
     return {'ok': True, 'task': task, 'meetings': read_meetings_state()}
 
 
