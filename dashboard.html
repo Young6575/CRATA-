@@ -5252,6 +5252,36 @@ button.nav-item.active {
   white-space: nowrap;
 }
 
+.video-transcript-speaker.speaker-teacher {
+  border-color: rgba(59,130,246,0.42);
+  background: rgba(59,130,246,0.16);
+  color: #bfdbfe;
+}
+
+.video-transcript-speaker.speaker-questioner {
+  border-color: rgba(245,158,11,0.42);
+  background: rgba(245,158,11,0.16);
+  color: #fde68a;
+}
+
+.video-transcript-speaker.speaker-1 {
+  border-color: rgba(20,184,166,0.42);
+  background: rgba(20,184,166,0.15);
+  color: #99f6e4;
+}
+
+.video-transcript-speaker.speaker-2 {
+  border-color: rgba(139,92,246,0.42);
+  background: rgba(139,92,246,0.16);
+  color: #ddd6fe;
+}
+
+.video-transcript-speaker.speaker-unknown {
+  border-color: rgba(148,163,184,0.24);
+  background: rgba(148,163,184,0.08);
+  color: #cbd5e1;
+}
+
 .video-transcript-text {
   color: #f3f7fb;
   font-family: 'Noto Sans KR', var(--font-sans);
@@ -11999,6 +12029,15 @@ function normalizeTranscriptSpeaker(raw) {
   return value.length > 16 ? value.slice(0, 16) : value;
 }
 
+function speakerClassForTranscript(speaker) {
+  const label = String(speaker || '').trim();
+  if (/강사/.test(label)) return 'speaker-teacher';
+  if (/질문자/.test(label)) return 'speaker-questioner';
+  const num = label.match(/화자\s*(\d+)/);
+  if (num) return Number(num[1]) % 2 === 0 ? 'speaker-2' : 'speaker-1';
+  return 'speaker-unknown';
+}
+
 function basicSubtitleTextCleanup(text) {
   return String(text || '')
     .replace(/\{[^}]*\}/g, '')
@@ -12224,7 +12263,7 @@ function renderFinalTranscriptRows() {
     ${shownRows.map(row => `
       <div class="video-transcript-row">
         <div class="video-transcript-time">${escapeHtml(row.time || '')}</div>
-        <div class="video-transcript-speaker">${escapeHtml(row.speaker || '화자 미분류')}</div>
+        <div class="video-transcript-speaker ${speakerClassForTranscript(row.speaker)}">${escapeHtml(row.speaker || '화자 미분류')}</div>
         <div class="video-transcript-text" style="font-size:${fontSize}px;">${escapeHtml(row.text || '')}</div>
       </div>
     `).join('')}
@@ -12346,12 +12385,14 @@ async function viewVideoArtifact(path, title, stepId) {
   renderVideoProcessFlow(latestVideoStatusData, totalCount, completedCount);
 }
 
-function renderVideoChanges(changes) {
-  const list = Array.isArray(changes) ? changes : [];
+function renderVideoChanges(changes, limit = 10) {
+  const rawList = Array.isArray(changes) ? changes : (changes ? [changes] : []);
+  const list = rawList.map(change => normalizeVideoChangeItem(change)).filter(Boolean);
   if (!list.length) return '';
+  const maxItems = Math.max(1, Number(limit) || 10);
   return `
     <div style="margin-top:9px;display:flex;flex-direction:column;gap:6px;">
-      ${list.slice(0, 10).map(change => {
+      ${list.slice(0, maxItems).map(change => {
         const before = change.before ?? change.original ?? change.from ?? '';
         const after = change.after ?? change.revised ?? change.to ?? '';
         const reason = change.reason || change.note || '';
@@ -12368,18 +12409,181 @@ function renderVideoChanges(changes) {
           </div>
         `;
       }).join('')}
-      ${list.length > 10 ? `<div style="font-size:11px;color:var(--text-muted);">외 ${list.length - 10}개 변경사항은 결과 파일에서 확인하세요.</div>` : ''}
+      ${list.length > maxItems ? `<div style="font-size:11px;color:var(--text-muted);">외 ${list.length - maxItems}개 변경사항은 결과 파일에서 확인하세요.</div>` : ''}
+    </div>
+  `;
+}
+
+function normalizeVideoChangeItem(change) {
+  if (!change || typeof change !== 'object') return null;
+  const before = change.before ?? change.original ?? change.from ?? change.source ?? change.current ?? change.issue ?? change.problem ?? '';
+  const after = change.after ?? change.revised ?? change.to ?? change.target ?? change.fixed ?? change.suggestion ?? change.proposal ?? '';
+  const reason = change.reason || change.note || change.basis || change.why || change.comment || '';
+  const where = change.segment || change.time || change.timestamp || change.index || change.where || '';
+  if (!String(before || after || reason || where).trim()) return null;
+  return {
+    before: String(before || '확인 필요').trim(),
+    after: String(after || '확인 필요').trim(),
+    reason: String(reason || '').trim(),
+    segment: String(where || '').trim(),
+  };
+}
+
+function collectVideoChangeObjects(value, out = []) {
+  if (!value) return out;
+  if (Array.isArray(value)) {
+    value.forEach(item => collectVideoChangeObjects(item, out));
+    return out;
+  }
+  if (typeof value !== 'object') return out;
+  const direct = normalizeVideoChangeItem(value);
+  if (direct && (value.before !== undefined || value.after !== undefined || value.original !== undefined || value.revised !== undefined || value.from !== undefined || value.to !== undefined)) {
+    out.push(direct);
+  }
+  ['changes', 'diff', 'diffs', 'revisions', 'items', 'results', 'corrections', 'speaker_changes', 'term_changes'].forEach(key => {
+    if (value[key]) collectVideoChangeObjects(value[key], out);
+  });
+  return out;
+}
+
+function selectedVideoArtifactEntry() {
+  const path = String(selectedVideoArtifact.path || '').toLowerCase();
+  if (!path) return {};
+  return videoArtifactEntries(latestVideoStatusData || {}, selectedVideoArtifact.stepId)
+    .find(item => String((item && (item.path || item.file || item.url)) || '').toLowerCase() === path) || {};
+}
+
+function cleanVideoChangeLine(line) {
+  return String(line || '')
+    .replace(/^\s*[-*]\s*/, '')
+    .replace(/^\s*[✓✔✗⚠!]+\s*/, '')
+    .replace(/^`+|`+$/g, '')
+    .trim();
+}
+
+function parseVideoArtifactTextChanges(content, stepId) {
+  const lines = String(content || '').replace(/\r/g, '').split('\n');
+  const changes = [];
+  let pending = null;
+
+  function push(change) {
+    const normalized = normalizeVideoChangeItem(change);
+    if (normalized) changes.push(normalized);
+  }
+
+  lines.forEach((rawLine, index) => {
+    const line = cleanVideoChangeLine(rawLine);
+    if (!line || /^#{1,6}\s/.test(line) || /^[-:|\s]+$/.test(line)) return;
+
+    const beforeMatch = line.match(/^(?:기존|원문|원본|before|from|오류|오인식|현재|수정 전)\s*[:：]\s*(.+)$/i);
+    const afterMatch = line.match(/^(?:변경|수정|교정|after|to|제안|개선|수정 후)\s*[:：]\s*(.+)$/i);
+    const reasonMatch = line.match(/^(?:근거|이유|reason|note)\s*[:：]\s*(.+)$/i);
+    const whereMatch = line.match(/^(?:구간|시간|segment|time)\s*[:：]\s*(.+)$/i);
+    if (beforeMatch) {
+      if (pending?.before && pending?.after) push(pending);
+      pending = { before: beforeMatch[1] };
+      return;
+    }
+    if (afterMatch) {
+      pending = pending || {};
+      pending.after = afterMatch[1];
+      push(pending);
+      pending = null;
+      return;
+    }
+    if (reasonMatch && pending) {
+      pending.reason = reasonMatch[1];
+      return;
+    }
+    if (whereMatch && pending) {
+      pending.segment = whereMatch[1];
+      return;
+    }
+
+    const inline = line.match(/^(.{2,180}?)\s*(?:→|=>|⇒|->)\s*(.{1,220})$/);
+    if (inline && !/^\d{1,2}:\d{2}:\d{2}[,.]\d{1,3}\s*-->/i.test(line)) {
+      push({ before: inline[1], after: inline[2] });
+      return;
+    }
+
+    if (line.includes('|') && !/^\|?\s*-+\s*\|/.test(line)) {
+      const cells = line.split('|').map(cell => cell.trim()).filter(Boolean);
+      if (cells.length >= 2 && !cells.some(cell => /기존|변경|before|after/i.test(cell) && cells.length <= 3)) {
+        const maybeBefore = cells[cells.length >= 4 ? 1 : 0];
+        const maybeAfter = cells[cells.length >= 4 ? 2 : 1];
+        if (maybeBefore && maybeAfter && maybeBefore !== maybeAfter) {
+          push({ segment: cells.length >= 4 ? cells[0] : '', before: maybeBefore, after: maybeAfter, reason: cells.length >= 4 ? cells[3] : '' });
+        }
+      }
+      return;
+    }
+
+    if (['transcript_quality_review', 'speaker_review', 'crata_term_correction'].includes(stepId)) {
+      const issue = line.match(/^(?:#?\d+|\[\d{1,2}:\d{2}|\d{1,2}:\d{2}|\S+\s*구간|이슈|확인)\s*(.+)$/);
+      if (/이슈|오인식|깨진|반복|어색|뒤바뀜|확인 필요|외국어|문자|비정상|질문/.test(line) || issue) {
+        const segment = (line.match(/(?:#\d+|\d{1,2}:\d{2}:\d{2}[,.]\d{1,3}|\d{1,2}:\d{2})/) || [''])[0];
+        push({
+          segment: segment || `line ${index + 1}`,
+          before: line,
+          after: stepId === 'speaker_review' ? '화자 라벨 확인/수정 필요' : '수정 후보 확인 필요',
+          reason: stepId === 'transcript_quality_review' ? '전사 품질검토 리포트에서 추출' : '검토 리포트에서 추출',
+        });
+      }
+    }
+  });
+
+  if (pending?.before || pending?.after) push(pending);
+  return changes;
+}
+
+function extractVideoArtifactChanges(content, stepId, entry = {}) {
+  const changes = [
+    ...collectVideoChangeObjects(entry.changes || entry.diff || entry.revisions || entry.corrections || entry.speaker_changes || []),
+  ];
+  try {
+    const parsed = JSON.parse(String(content || ''));
+    changes.push(...collectVideoChangeObjects(parsed));
+  } catch (_) {}
+  changes.push(...parseVideoArtifactTextChanges(content, stepId));
+
+  const seen = new Set();
+  return changes.filter(item => {
+    const normalized = normalizeVideoChangeItem(item);
+    if (!normalized) return false;
+    Object.assign(item, normalized);
+    const key = `${item.segment}|${item.before}|${item.after}`.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function renderVideoArtifactChangeSummary(content, stepId, entry = {}) {
+  const changes = extractVideoArtifactChanges(content, stepId, entry);
+  if (!changes.length || !['transcript_quality_review', 'crata_term_correction', 'speaker_review'].includes(stepId)) return '';
+  return `
+    <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;">
+        <div style="font-size:12px;font-weight:850;color:var(--text-white);">변경/검토 항목</div>
+        <div style="font-size:10.5px;color:var(--text-muted);font-family:var(--font-mono);">${changes.length} items</div>
+      </div>
+      ${renderVideoChanges(changes.slice(0, 40), 40)}
+      ${changes.length > 40 ? `<div style="margin-top:8px;color:var(--text-muted);font-size:11px;">외 ${changes.length - 40}개 항목은 원문에서 확인하세요.</div>` : ''}
     </div>
   `;
 }
 
 function renderSelectedVideoArtifact(stepId) {
   if (!selectedVideoArtifact.path || selectedVideoArtifact.stepId !== stepId) return '';
+  const artifactEntry = selectedVideoArtifact.loading || selectedVideoArtifact.error ? {} : selectedVideoArtifactEntry();
+  const changeSummary = selectedVideoArtifact.loading || selectedVideoArtifact.error
+    ? ''
+    : renderVideoArtifactChangeSummary(selectedVideoArtifact.content || '', selectedVideoArtifact.stepId, artifactEntry);
   const body = selectedVideoArtifact.loading
     ? '<div style="padding:18px;color:var(--text-muted);font-size:12px;">결과 파일을 읽는 중입니다.</div>'
     : selectedVideoArtifact.error
       ? `<div style="padding:18px;color:var(--red);font-size:12px;">${escapeHtml(selectedVideoArtifact.error)}</div>`
-      : `<pre style="margin:0;max-height:360px;overflow:auto;white-space:pre-wrap;word-break:break-word;font-family:var(--font-mono);font-size:11.5px;line-height:1.55;color:var(--text-hover);">${escapeHtml(selectedVideoArtifact.content || '내용이 없습니다.')}</pre>`;
+      : `<pre style="margin:0;max-height:360px;overflow:auto;white-space:pre-wrap;word-break:break-word;font-family:var(--font-mono);font-size:11.5px;line-height:1.55;color:var(--text-hover);">${escapeHtml(selectedVideoArtifact.content || '내용이 없습니다.')}</pre>${changeSummary}`;
   return `
     <div style="border:1px solid rgba(var(--accent-rgb),0.28);border-radius:var(--radius-md);background:rgba(0,0,0,0.2);overflow:hidden;">
       <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px 10px;border-bottom:1px solid var(--border);background:rgba(var(--accent-rgb),0.055);">
@@ -12413,7 +12617,7 @@ function renderVideoProcessResult(data, steps, selectedId) {
     const isVideo = /\.(mp4|mov|mkv|avi|webm|m4v|mxf)$/i.test(path);
     const previewBtn = isVideo && path ? `<button onclick="previewDesktopVideo('${escapeHtml(escapeJs(path))}')" style="padding:5px 8px;border-radius:var(--radius-sm);border:1px solid rgba(59,130,246,0.32);background:rgba(59,130,246,0.12);color:#bfdbfe;font-size:11px;font-weight:800;cursor:pointer;">미리보기</button>` : '';
     const viewBtn = !isVideo && path && videoArtifactIsText(path) ? `<button onclick="viewVideoArtifact('${escapeHtml(escapeJs(path))}','${escapeHtml(escapeJs(title))}','${escapeHtml(escapeJs(step.id))}')" style="padding:5px 8px;border-radius:var(--radius-sm);border:1px solid rgba(16,185,129,0.32);background:rgba(16,185,129,0.12);color:#bbf7d0;font-size:11px;font-weight:800;cursor:pointer;">보기</button>` : '';
-    const changesHtml = renderVideoChanges(item.changes || item.diff || item.revisions);
+    const changesHtml = renderVideoChanges(item.changes || item.diff || item.revisions || item.corrections || item.speaker_changes || item.term_changes, 8);
     return `
       <div style="padding:9px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:rgba(255,255,255,0.015);">
         <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;">

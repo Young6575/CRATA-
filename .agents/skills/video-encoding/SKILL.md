@@ -157,6 +157,7 @@ H:\Q&A 강의 영상\subtitle_agent.py
 각 단계 상태는 `process_status.<id>.status`에 `pending`, `active`, `waiting`, `done`, `error` 중 하나로 기록한다.
 미리보기 확인 대기 중에는 `status: "waiting_preview_review"`와 `current_process: "subtitle_preview_review"`를 같이 기록한다.
 각 단계의 산출물은 `process_results.<id>`에 `{ "title": "...", "path": "...", "note": "..." }` 형태로 기록한다.
+전사 품질검토, CRATA 용어 교정, 화자분리 검토에서 수정/확인 항목이 있으면 `changes` 배열에 `{ "before": "기존", "after": "변경", "reason": "근거", "segment": "시간대" }` 형태로 남긴다. 대시보드는 이를 보기 패널 아래에서 `기존 -> 변경` 카드로 표시한다.
 전사·화자분리·품질검토·용어 교정 결과는 사용자가 대시보드에서 바로 열어볼 수 있어야 한다. 텍스트 산출물에는 `viewer`를 함께 남긴다.
 화자분리 검토 단계에는 사용자가 크게 읽을 최종 전사록을 반드시 함께 남긴다.
 
@@ -170,7 +171,15 @@ H:\Q&A 강의 영상\subtitle_agent.py
       { "title": "화자분리 ASS 자막", "path": "H:/Q&A/sample.ass", "kind": "화자분리", "viewer": "diarized" }
     ],
     "transcript_quality_review": [
-      { "title": "전사 품질검토 리포트", "path": "H:/Q&A/sample_review.md", "kind": "품질검토", "viewer": "review" }
+      {
+        "title": "전사 품질검토 리포트",
+        "path": "H:/Q&A/sample_review.md",
+        "kind": "품질검토",
+        "viewer": "review",
+        "changes": [
+          { "before": "오인식된 문장", "after": "수정 후보 문장", "reason": "문맥상 어색한 전사", "segment": "00:02:10" }
+        ]
+      }
     ],
     "crata_term_correction": [
       {
@@ -185,7 +194,15 @@ H:\Q&A 강의 영상\subtitle_agent.py
     ],
     "speaker_review": [
       { "title": "최종 검토 전사록", "path": "H:/Q&A/sample_final_reviewed.srt", "kind": "최종 전사록", "viewer": "transcript" },
-      { "title": "화자분리 검토 리포트", "path": "H:/Q&A/sample_speaker_review.md", "kind": "화자분리 검토", "viewer": "review" }
+      {
+        "title": "화자분리 검토 리포트",
+        "path": "H:/Q&A/sample_speaker_review.md",
+        "kind": "화자분리 검토",
+        "viewer": "review",
+        "changes": [
+          { "before": "질문자", "after": "강사", "reason": "문맥상 설명 발화", "segment": "00:04:32" }
+        ]
+      }
     ]
   }
 }
