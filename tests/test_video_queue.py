@@ -121,6 +121,60 @@ class VideoQueueTests(unittest.TestCase):
         self.assertEqual(payload[0]["process_results"]["final_encode"][0]["title"], "최종 영상")
         self.assertEqual(payload[0]["message"], "완료")
 
+    def test_video_queue_payload_infers_review_and_term_artifacts_from_workspace(self):
+        workspace = self.root / "work" / "성장역량_김규아"
+        workspace.mkdir(parents=True)
+        video = workspace / "성장역량_김규아.mxf"
+        video.write_text("video", encoding="utf-8")
+        review = workspace / "성장역량_김규아_quality_review.md"
+        review.write_text("quality", encoding="utf-8")
+        term = workspace / "성장역량_김규아_term_correction.md"
+        term.write_text("term", encoding="utf-8")
+        self.write_task(
+            "task_done.json",
+            status="done",
+            videoSourcePath="H:\\Q&A 강의 영상\\김규아\\성장역량\\성장역량_김규아.MXF",
+            videoWorkspaceRoot=str(workspace),
+            videoStatusSnapshot={
+                "status": "done",
+                "workspace_path": str(workspace),
+                "source_path": "H:\\Q&A 강의 영상\\김규아\\성장역량\\성장역량_김규아.MXF",
+                "process_status": {
+                    "transcript_quality_review": {"status": "done", "progress": 100},
+                    "crata_term_correction": {"status": "done", "progress": 100},
+                },
+            },
+        )
+
+        payload = server.video_queue_payload()
+
+        results = payload[0]["process_results"]
+        self.assertEqual(results["transcript_quality_review"][0]["path"], str(review))
+        self.assertEqual(results["crata_term_correction"][0]["path"], str(term))
+
+    def test_video_queue_payload_finds_legacy_workspace_by_source_name(self):
+        workspace_root = self.root / "처리관리" / "video_workspaces"
+        workspace = workspace_root / "_staging_20260531_020726_성장역량_김규아"
+        workspace.mkdir(parents=True)
+        video = workspace / "성장역량_김규아.mxf"
+        video.write_text("video", encoding="utf-8")
+        review = workspace / "성장역량_김규아_review.md"
+        review.write_text("quality", encoding="utf-8")
+        term = workspace / "성장역량_김규아_term_correction.md"
+        term.write_text("term", encoding="utf-8")
+        self.write_task(
+            "task_legacy.json",
+            status="done",
+            videoSourcePath="H:\\Q&A 강의 영상\\김규아\\성장역량\\성장역량_김규아.MXF",
+            videoWorkspaceRoot=str(workspace_root),
+        )
+
+        payload = server.video_queue_payload()
+
+        results = payload[0]["process_results"]
+        self.assertEqual(results["transcript_quality_review"][0]["path"], str(review))
+        self.assertEqual(results["crata_term_correction"][0]["path"], str(term))
+
     def test_continue_video_queue_after_task_saves_process_snapshot(self):
         current = self.write_task("task_current.json", status="done")
         self.write_task("task_next.json", status="queued", created_at="2026-05-31T00:01:00")

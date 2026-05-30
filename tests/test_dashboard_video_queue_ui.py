@@ -26,6 +26,13 @@ class DashboardVideoQueueUiTests(unittest.TestCase):
         self.assertIn("activeVideoProcessData", body)
         self.assertIn("ensureFinalTranscriptArtifact(activeData)", body)
 
+    def test_video_page_does_not_render_duplicate_queue_detail_panel(self):
+        self.assertNotIn("video-job-detail-panel", self.html)
+
+    def test_queue_renderer_does_not_update_duplicate_detail_panel(self):
+        body = self.function_body("renderVideoJobQueue")
+        self.assertNotIn("renderVideoJobDetail", body)
+
 
 if __name__ == "__main__":
     unittest.main()

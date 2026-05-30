@@ -826,9 +826,64 @@ def add_process_result_entry(process_results, process_id, entry):
     process_results[process_id] = items
 
 
+def video_lookup_token(value):
+    text = str(value or '').strip()
+    if not text:
+        return ''
+    name = re.split(r'[\\/]+', text)[-1]
+    stem = pathlib.PurePath(name).stem or name
+    return re.sub(r'[\W_]+', '', stem.lower(), flags=re.UNICODE)
+
+
+def find_video_task_workspace_path(task, max_items=5000):
+    root_raw = task.get('videoWorkspaceRoot') or task.get('workspace_root') or ''
+    if not root_raw:
+        return ''
+    try:
+        root = pathlib.Path(str(root_raw)).expanduser().resolve()
+    except Exception:
+        return ''
+    if not root.exists():
+        return ''
+    if root.is_file():
+        return str(root.parent)
+
+    source_token = video_lookup_token(task.get('videoSourcePath') or task.get('source_path') or task.get('title'))
+    if not source_token:
+        return str(root)
+
+    matches = []
+    scanned = 0
+    try:
+        for child in root.rglob('*'):
+            scanned += 1
+            if scanned > max_items:
+                break
+            try:
+                if child.is_dir():
+                    if source_token in video_lookup_token(child.name):
+                        matches.append(child)
+                elif child.is_file() and child.suffix.lower() in VIDEO_EXTENSIONS:
+                    if source_token in video_lookup_token(child.name):
+                        matches.append(child.parent)
+            except Exception:
+                continue
+    except Exception:
+        return ''
+
+    if not matches:
+        return ''
+    unique = {}
+    for path in matches:
+        unique[str(path).lower()] = path
+    ordered = list(unique.values())
+    ordered.sort(key=lambda path: video_status_file_mtime(path), reverse=True)
+    return str(ordered[0])
+
+
 def video_source_paths_from_status(status):
     raw_paths = []
-    for key in ('source_path', 'videoSourcePath', 'current_file'):
+    for key in ('source_path', 'videoSourcePath', 'current_file', 'workspace_path', 'workspace_root'):
         value = str(status.get(key) or '').strip()
         if value:
             raw_paths.append(value)
@@ -2155,9 +2210,18 @@ def video_task_live_status(task, current_status=None):
 def video_task_process_snapshot(task, current_status=None):
     live_status = video_task_live_status(task, current_status)
     if live_status:
-        return live_status
+        return enrich_video_process_results(dict(live_status))
     stored = task.get('videoStatusSnapshot')
-    return stored if isinstance(stored, dict) else {}
+    snapshot = dict(stored) if isinstance(stored, dict) else {}
+    if not snapshot.get('source_path') and task.get('videoSourcePath'):
+        snapshot['source_path'] = task.get('videoSourcePath')
+    if not snapshot.get('workspace_path'):
+        workspace_path = find_video_task_workspace_path(task)
+        if workspace_path:
+            snapshot['workspace_path'] = workspace_path
+    if not snapshot:
+        return {}
+    return enrich_video_process_results(snapshot)
 
 
 def record_video_task_status_snapshot(fpath):
