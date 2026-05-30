@@ -64,6 +64,13 @@ VIDEO_PROCESS_ALIASES = {
     'encode': 'final_encode',
     'final': 'final_encode',
 }
+VIDEO_STATUS_SNAPSHOT_KEYS = {
+    'status', 'progress', 'batch_progress', 'total_files', 'completed_files',
+    'current_step', 'current_process', 'current_process_label', 'process_steps',
+    'process_status', 'process_results', 'artifacts', 'message', 'preview_file',
+    'source_path', 'original_source_path', 'current_file', 'workspace_root',
+    'workspace_path', 'moved_files', 'prepared_files', 'speaker_count',
+}
 
 DEFAULT_CATEGORIES = [
     {'id': 'phrase-edit', 'name': '문구수정', 'color': 'blue', 'keywords': ['문구', '결과지', '카피', '표현', '윤문', 'revise', 'phrase']},
@@ -1091,7 +1098,7 @@ def video_status_payload():
     try:
         task_matches = find_video_task_files()
         latest_video_task = task_matches[0][1] if task_matches else {}
-        status['video_queue'] = video_queue_payload()
+        status['video_queue'] = video_queue_payload(current_status=status)
     except Exception:
         latest_video_task = {}
         status['video_queue'] = []
@@ -2122,7 +2129,59 @@ def find_video_task_files(task_id=''):
     return matches
 
 
-def video_queue_payload(limit=20):
+def compact_video_status_snapshot(status):
+    snapshot = {}
+    for key in VIDEO_STATUS_SNAPSHOT_KEYS:
+        value = status.get(key)
+        if value not in (None, '', [], {}):
+            snapshot[key] = value
+    if snapshot.get('process_steps') is None:
+        snapshot['process_steps'] = VIDEO_PROCESS_STEPS
+    return snapshot
+
+
+def video_task_live_status(task, current_status=None):
+    if not current_status:
+        return {}
+    task_active = task.get('status') in ('pending', 'active') and task_process_alive(task)
+    if task_active:
+        return compact_video_status_snapshot(current_status)
+    runner_task = current_status.get('runner_task') if isinstance(current_status.get('runner_task'), dict) else {}
+    if runner_task.get('id') and str(runner_task.get('id')) == str(task.get('id') or ''):
+        return compact_video_status_snapshot(current_status)
+    return {}
+
+
+def video_task_process_snapshot(task, current_status=None):
+    live_status = video_task_live_status(task, current_status)
+    if live_status:
+        return live_status
+    stored = task.get('videoStatusSnapshot')
+    return stored if isinstance(stored, dict) else {}
+
+
+def record_video_task_status_snapshot(fpath):
+    status = compact_video_status_snapshot(read_video_status())
+    if not status:
+        return {}
+
+    def mutate(t):
+        t['videoStatusSnapshot'] = status
+        t['videoStatusSnapshotAt'] = now_iso()
+        if status.get('status') == 'waiting_preview_review':
+            t['status'] = 'waiting_review'
+            t['statusLbl'] = '확인 대기'
+            try:
+                t['progress'] = max(int(t.get('progress') or 0), int(status.get('progress') or 0))
+            except (TypeError, ValueError):
+                t['progress'] = int(t.get('progress') or 0)
+            append_task_log(t, '시스템', '미리보기 검수 대기 상태로 멈췄습니다. 확인 후 승인하면 후속 인코딩을 진행하세요.')
+
+    update_task_file(fpath, mutate)
+    return status
+
+
+def video_queue_payload(limit=20, current_status=None):
     items = []
     for fpath, task in find_video_task_files():
         try:
@@ -2130,7 +2189,8 @@ def video_queue_payload(limit=20):
         except (TypeError, ValueError):
             progress = 0
         active = task.get('status') in ('pending', 'active') and task_process_alive(task)
-        items.append({
+        snapshot = video_task_process_snapshot(task, current_status)
+        item = {
             'id': task.get('id') or pathlib.Path(fpath).stem.removeprefix('task_'),
             'title': task.get('title') or pathlib.Path(fpath).name,
             'status': task.get('status') or '',
@@ -2149,7 +2209,21 @@ def video_queue_payload(limit=20):
             'completed_at': task.get('completed_at') or '',
             'cancelled_at': task.get('cancelled_at') or '',
             'error': task.get('error') or '',
-        })
+            'collab_logs': task.get('collabLogs') if isinstance(task.get('collabLogs'), list) else [],
+        }
+        for key in (
+            'current_process', 'current_process_label', 'process_steps', 'process_status',
+            'process_results', 'artifacts', 'message', 'preview_file', 'completed_files',
+            'workspace_path', 'source_path', 'current_file',
+        ):
+            if snapshot.get(key) not in (None, '', [], {}):
+                item[key] = snapshot.get(key)
+        if snapshot.get('progress') is not None and active:
+            try:
+                item['progress'] = max(item['progress'], int(float(snapshot.get('progress') or 0)))
+            except (TypeError, ValueError):
+                pass
+        items.append(item)
     return items[:limit]
 
 
@@ -2215,6 +2289,9 @@ def auto_start_next_video_task():
 def continue_video_queue_after_task(fpath):
     task = read_json_file(fpath, {})
     if task.get('type') != 'video_encoding':
+        return None
+    snapshot = record_video_task_status_snapshot(fpath)
+    if snapshot.get('status') == 'waiting_preview_review':
         return None
     return auto_start_next_video_task()
 

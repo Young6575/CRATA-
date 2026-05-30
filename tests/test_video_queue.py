@@ -95,6 +95,69 @@ class VideoQueueTests(unittest.TestCase):
         self.assertEqual(payload[0]["status_label"], "대기열")
         self.assertIn("created_at", payload[0])
 
+    def test_video_queue_payload_includes_process_snapshot_for_dashboard_detail(self):
+        self.write_task(
+            "task_done.json",
+            status="done",
+            videoStatusSnapshot={
+                "status": "done",
+                "current_process": "final_encode",
+                "current_process_label": "최종 인코딩 완료",
+                "process_status": {
+                    "raw_transcribe": {"status": "done", "progress": 100},
+                    "final_encode": {"status": "done", "progress": 100},
+                },
+                "process_results": {
+                    "final_encode": [{"title": "최종 영상", "path": "C:\\work\\result_final.mp4"}],
+                },
+                "message": "완료",
+            },
+        )
+
+        payload = server.video_queue_payload()
+
+        self.assertEqual(payload[0]["current_process"], "final_encode")
+        self.assertEqual(payload[0]["process_status"]["raw_transcribe"]["status"], "done")
+        self.assertEqual(payload[0]["process_results"]["final_encode"][0]["title"], "최종 영상")
+        self.assertEqual(payload[0]["message"], "완료")
+
+    def test_continue_video_queue_after_task_saves_process_snapshot(self):
+        current = self.write_task("task_current.json", status="done")
+        self.write_task("task_next.json", status="queued", created_at="2026-05-31T00:01:00")
+
+        with mock.patch.object(server, "read_video_status", return_value={
+                "status": "done",
+                "current_process": "final_encode",
+                "process_status": {"final_encode": {"status": "done", "progress": 100}},
+                "message": "최종 인코딩 완료",
+            }), \
+                mock.patch.object(server, "task_process_alive", return_value=False), \
+                mock.patch.object(server, "start_task_worker"):
+            server.continue_video_queue_after_task(current)
+
+        updated = json.loads(current.read_text(encoding="utf-8"))
+        self.assertEqual(updated["videoStatusSnapshot"]["current_process"], "final_encode")
+        self.assertEqual(updated["videoStatusSnapshot"]["process_status"]["final_encode"]["progress"], 100)
+
+    def test_continue_video_queue_after_task_marks_preview_waiting_as_user_action(self):
+        current = self.write_task("task_current.json", status="active")
+        self.write_task("task_next.json", status="queued", created_at="2026-05-31T00:01:00")
+
+        with mock.patch.object(server, "read_video_status", return_value={
+                "status": "waiting_preview_review",
+                "current_process": "subtitle_preview_review",
+                "preview_file": "C:\\work\\sample_preview.mp4",
+            }), \
+                mock.patch.object(server, "task_process_alive", return_value=False), \
+                mock.patch.object(server, "start_task_worker") as start_worker:
+            selected = server.continue_video_queue_after_task(current)
+
+        self.assertIsNone(selected)
+        start_worker.assert_not_called()
+        updated = json.loads(current.read_text(encoding="utf-8"))
+        self.assertEqual(updated["status"], "waiting_review")
+        self.assertEqual(updated["statusLbl"], "확인 대기")
+
 
 if __name__ == "__main__":
     unittest.main()

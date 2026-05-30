@@ -8307,6 +8307,7 @@ body:not([data-page="home"]) .calendar-day.selected {
           <span id="video-job-queue-count" style="font-size:11px;font-family:var(--font-mono);color:var(--text-muted);padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:var(--bg-input);white-space:nowrap;">0개</span>
         </div>
         <div id="video-job-queue-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px;"></div>
+        <div id="video-job-detail-panel" style="margin-top:10px;"></div>
       </div>
 
       <!-- 프로세스 단계 / 선택 결과 -->
@@ -13885,6 +13886,7 @@ const VIDEO_PROCESS_ALIASES = {
 let selectedVideoProcessId = '';
 let latestVideoStatusData = {};
 let selectedVideoArtifact = { stepId: '', path: '', title: '', content: '', loading: false, error: '', truncated: false };
+let selectedVideoJobId = '';
 
 function emptySelectedVideoArtifact() {
   return { stepId: '', path: '', title: '', content: '', loading: false, error: '', truncated: false };
@@ -14986,11 +14988,158 @@ function videoQueueLabel(item) {
     active: '진행 중',
     pending: '대기 중',
     queued: '대기열',
+    waiting_review: '확인 대기',
     done: '완료됨',
     completed: '완료됨',
     error: '실패',
     cancelled: '중지됨',
   }[status] || '대기';
+}
+
+function selectVideoJob(id) {
+  selectedVideoJobId = String(id || '');
+  renderVideoJobQueue(latestVideoStatusData?.video_queue || []);
+}
+
+function videoJobDisplayStatus(item) {
+  return item?.status === 'waiting_review' ? 'waiting_preview_review' : (item?.status || 'idle');
+}
+
+function videoJobProcessData(item) {
+  return {
+    ...(item || {}),
+    status: videoJobDisplayStatus(item),
+    progress: item?.progress ?? 0,
+    process_steps: Array.isArray(item?.process_steps) && item.process_steps.length ? item.process_steps : defaultVideoProcessSteps(),
+    process_status: item?.process_status && typeof item.process_status === 'object' ? item.process_status : {},
+    current_process: item?.current_process || (item?.status === 'queued' ? '' : 'raw_transcribe'),
+  };
+}
+
+function videoJobArtifactEntries(item) {
+  const entries = [];
+  const results = item?.process_results && typeof item.process_results === 'object' ? item.process_results : {};
+  Object.entries(results).forEach(([stepId, value]) => {
+    const list = Array.isArray(value) ? value : (value ? [value] : []);
+    list.forEach(entry => entries.push({ ...(typeof entry === 'string' ? { path: entry } : entry), process: stepId }));
+  });
+  if (Array.isArray(item?.artifacts)) entries.push(...item.artifacts);
+  if (item?.preview_file) entries.push({ title: '미리보기', path: item.preview_file, viewer: 'video', process: 'subtitle_preview_review' });
+  (Array.isArray(item?.completed_files) ? item.completed_files : []).forEach(path => entries.push({ title: '완료 파일', path, viewer: 'video', process: 'final_encode' }));
+  const seen = new Set();
+  return entries.filter(entry => {
+    const path = videoArtifactPath(entry);
+    if (!path || seen.has(path)) return false;
+    seen.add(path);
+    return true;
+  });
+}
+
+function renderVideoJobDetail(item) {
+  const panel = document.getElementById('video-job-detail-panel');
+  if (!panel) return;
+  if (!item) {
+    panel.innerHTML = '';
+    return;
+  }
+
+  const data = videoJobProcessData(item);
+  const steps = videoProcessStepsFromStatus(data);
+  const currentId = currentVideoProcessId(data, steps);
+  const currentIndex = steps.findIndex(step => step.id === currentId);
+  const status = videoJobDisplayStatus(item);
+  const doneAll = ['done', 'completed'].includes(String(item.status || '').toLowerCase());
+  const queued = String(item.status || '').toLowerCase() === 'queued';
+  const waitingPreview = status === 'waiting_preview_review';
+  const processStatus = data.process_status || {};
+  const artifacts = videoJobArtifactEntries(item).slice(0, 8);
+  const logs = Array.isArray(item.collab_logs) ? item.collab_logs.slice(-5) : [];
+  const source = item.source_path || item.current_file || '';
+  const workspace = item.workspace_path || item.workspace_root || '';
+
+  const stepHtml = steps.map((step, index) => {
+    const explicitState = processStatus[step.id]?.status || '';
+    let state = explicitState;
+    if (!state) {
+      if (doneAll) state = 'done';
+      else if (waitingPreview && step.id === 'subtitle_preview_review') state = 'waiting';
+      else if (queued) state = 'pending';
+      else if (currentIndex >= 0 && index < currentIndex) state = 'done';
+      else if (index === currentIndex) state = 'active';
+      else state = 'pending';
+    }
+    const pct = Number(processStatus[step.id]?.progress ?? (state === 'done' ? 100 : state === 'active' ? item.progress : 0));
+    const tone = state === 'done' ? 'var(--green)' : state === 'active' ? 'var(--yellow)' : state === 'waiting' ? 'var(--blue)' : state === 'error' ? 'var(--red)' : 'var(--text-muted)';
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 9px;border:1px solid var(--border);border-radius:var(--radius-sm);background:rgba(255,255,255,0.012);min-width:0;">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0;">
+          <span style="width:7px;height:7px;border-radius:50%;background:${tone};flex-shrink:0;"></span>
+          <span style="font-size:12px;color:var(--text-white);font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${index + 1}. ${escapeHtml(step.label)}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;flex-shrink:0;">
+          <span style="font-size:10.5px;color:var(--text-muted);font-family:var(--font-mono);">${Math.max(0, Math.min(100, Math.round(pct)))}%</span>
+          <span style="font-size:10px;color:${tone};font-weight:850;">${processStateLabel(state)}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const artifactHtml = artifacts.length ? artifacts.map(entry => {
+    const path = videoArtifactPath(entry);
+    const isVideo = /\.(mp4|mov|mkv|avi|webm|m4v|mts|m2ts|mxf)$/i.test(path);
+    const title = entry.title || entry.kind || videoPathName(path);
+    const action = isVideo
+      ? `<button onclick="event.stopPropagation(); previewDesktopVideo('${escapeHtml(escapeJs(path))}')" style="padding:4px 7px;border-radius:var(--radius-sm);border:1px solid rgba(59,130,246,0.32);background:rgba(59,130,246,0.12);color:#bfdbfe;font-size:10.5px;font-weight:800;cursor:pointer;">미리보기</button>`
+      : `<button onclick="event.stopPropagation(); selectVideoProcess('${escapeHtml(escapeJs(entry.process || 'raw_transcribe'))}'); viewVideoArtifact('${escapeHtml(escapeJs(path))}', '${escapeHtml(escapeJs(title))}', '${escapeHtml(escapeJs(entry.process || 'raw_transcribe'))}')" style="padding:4px 7px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-input);color:var(--text-hover);font-size:10.5px;font-weight:800;cursor:pointer;">열기</button>`;
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 9px;border:1px solid var(--border);border-radius:var(--radius-sm);background:rgba(255,255,255,0.012);min-width:0;">
+        <div style="min-width:0;">
+          <div style="font-size:11.5px;color:var(--text-white);font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(title)}</div>
+          <div style="font-size:10.5px;color:var(--text-muted);font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(path)}</div>
+        </div>
+        ${action}
+      </div>
+    `;
+  }).join('') : `<div style="font-size:11.5px;color:var(--text-muted);padding:8px 0;">아직 표시할 산출물이 없습니다.</div>`;
+
+  const logHtml = logs.length ? logs.map(log => `
+    <div style="font-size:11px;color:var(--text-muted);line-height:1.45;">
+      <span style="font-family:var(--font-mono);color:var(--text);">${escapeHtml(log.sender || '시스템')} ${escapeHtml(log.time || '')}</span>
+      ${escapeHtml(log.msg || '')}
+    </div>
+  `).join('') : `<div style="font-size:11.5px;color:var(--text-muted);">최근 로그가 없습니다.</div>`;
+
+  panel.innerHTML = `
+    <div style="border:1px solid rgba(var(--accent-rgb),0.38);border-radius:var(--radius-md);background:rgba(var(--accent-rgb),0.045);padding:13px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px;">
+        <div style="min-width:0;">
+          <div style="font-size:13px;font-weight:850;color:var(--text-white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.title || '영상 작업')}</div>
+          <div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;">${escapeHtml(item.message || item.current_process_label || '작업 상태를 확인 중입니다.')}</div>
+        </div>
+        <span style="font-size:10.5px;font-weight:850;color:var(--accent);padding:4px 8px;border-radius:999px;border:1px solid rgba(var(--accent-rgb),0.35);background:rgba(0,0,0,0.16);white-space:nowrap;">${escapeHtml(videoQueueLabel(item))} · ${Math.round(Number(item.progress || 0))}%</span>
+      </div>
+      <div style="display:grid;grid-template-columns:minmax(260px,1.1fr) minmax(260px,0.9fr);gap:10px;">
+        <div style="display:flex;flex-direction:column;gap:7px;">
+          <div style="font-size:11px;color:var(--text-muted);font-weight:850;text-transform:uppercase;">프로세스</div>
+          ${stepHtml}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:9px;min-width:0;">
+          <div>
+            <div style="font-size:11px;color:var(--text-muted);font-weight:850;text-transform:uppercase;margin-bottom:6px;">경로</div>
+            <div style="font-size:11.5px;color:var(--text);line-height:1.45;font-family:var(--font-mono);word-break:break-all;">소스: ${escapeHtml(source || '-')}<br>작업 폴더: ${escapeHtml(workspace || '-')}</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text-muted);font-weight:850;text-transform:uppercase;margin-bottom:6px;">산출물</div>
+            <div style="display:flex;flex-direction:column;gap:6px;">${artifactHtml}</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text-muted);font-weight:850;text-transform:uppercase;margin-bottom:6px;">최근 로그</div>
+            <div style="display:flex;flex-direction:column;gap:4px;">${logHtml}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function renderVideoJobQueue(items = []) {
@@ -14999,6 +15148,11 @@ function renderVideoJobQueue(items = []) {
   if (!list) return;
 
   const rows = Array.isArray(items) ? items : [];
+  if (rows.length && !rows.some(item => String(item.id || '') === selectedVideoJobId)) {
+    const firstActive = rows.find(item => item.active || ['active', 'pending', 'waiting_review'].includes(String(item.status || '').toLowerCase()));
+    selectedVideoJobId = String((firstActive || rows[0]).id || '');
+  }
+  const selectedItem = rows.find(item => String(item.id || '') === selectedVideoJobId) || null;
   const activeCount = rows.filter(item => item.active || ['active', 'pending'].includes(String(item.status || '').toLowerCase())).length;
   const queuedCount = rows.filter(item => String(item.status || '').toLowerCase() === 'queued').length;
   if (count) count.textContent = rows.length ? `${activeCount} 진행 · ${queuedCount} 대기` : '0개';
@@ -15009,18 +15163,20 @@ function renderVideoJobQueue(items = []) {
         아직 등록된 영상 작업이 없습니다.
       </div>
     `;
+    renderVideoJobDetail(null);
     return;
   }
 
   list.innerHTML = rows.slice(0, 12).map(item => {
     const tone = videoQueueTone(item);
+    const selected = String(item.id || '') === selectedVideoJobId;
     const progress = Math.max(0, Math.min(100, Math.round(Number(item.progress || 0))));
     const sourceName = item.source_path ? videoPathName(item.source_path) : (item.file_count ? `${item.file_count}개 파일` : '소스 대기');
     const time = formatShortDate(item.started_at || item.queued_at || item.created_at || item.updated_at);
     const stepText = Array.isArray(item.steps) && item.steps.length ? item.steps.slice(0, 4).join(' · ') : '';
     const meta = [time, item.file_count ? `${item.file_count}개` : '', item.active ? '실행 중' : ''].filter(Boolean).join(' · ');
     return `
-      <div style="border:1px solid ${tone.border};border-radius:var(--radius-md);background:${tone.bg};padding:11px 12px;min-width:0;">
+      <div onclick="selectVideoJob('${escapeHtml(escapeJs(item.id || ''))}')" style="border:1px solid ${selected ? 'rgba(var(--accent-rgb),0.58)' : tone.border};border-radius:var(--radius-md);background:${selected ? 'rgba(var(--accent-rgb),0.08)' : tone.bg};padding:11px 12px;min-width:0;cursor:pointer;">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:7px;">
           <div style="min-width:0;">
             <div style="font-size:12.5px;font-weight:800;color:var(--text-white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.title || sourceName)}</div>
@@ -15039,6 +15195,7 @@ function renderVideoJobQueue(items = []) {
       </div>
     `;
   }).join('');
+  renderVideoJobDetail(selectedItem);
 }
 
 // Real Polling from backend json (if running locally on webserver)
