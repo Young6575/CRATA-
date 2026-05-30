@@ -609,6 +609,22 @@ def video_upload_dir():
     return path
 
 
+def video_workspace_dir():
+    settings = read_local_settings()
+    video_settings = settings.get('video') if isinstance(settings.get('video'), dict) else {}
+    configured = video_settings.get('workspace_dir') or video_settings.get('work_dir')
+    if configured:
+        try:
+            path = pathlib.Path(str(configured)).expanduser()
+            path.mkdir(parents=True, exist_ok=True)
+            return path.resolve()
+        except Exception:
+            pass
+    path = ROOT / '처리관리' / 'video_workspaces'
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def safe_upload_filename(filename):
     name = pathlib.Path(str(filename or 'upload.mp4')).name
     name = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', '_', name).strip(' ._')
@@ -3466,6 +3482,7 @@ def create_video_encoding_task(data):
     speaker_count_label = f'{speaker_count}명' if speaker_count is not None else '미지정'
     file_preview = [str(path) for path in files[:20]]
     omitted_count = max(len(files) - len(file_preview), 0)
+    workspace_root = video_workspace_dir()
 
     status = {
         'status': 'requested',
@@ -3477,6 +3494,8 @@ def create_video_encoding_task(data):
         'current_step': 0,
         'requested_at': now_iso(),
         'source_path': source_path,
+        'original_source_path': source_path,
+        'workspace_root': str(workspace_root),
         'preset': preset,
         'preset_label': preset_label,
         'subtitle_style': subtitle_style,
@@ -3517,6 +3536,10 @@ def create_video_encoding_task(data):
 - 우선 repo 안의 .agents/skills/video-encoding/SKILL.md를 읽고 그 절차를 따르세요.
 - 실행 스크립트는 tools/video_agent/subtitle_agent.py를 우선 사용하세요. 아직 이관 전이면 C:\\Users\\wnsdu\\Desktop\\프로젝트\\영상편집에이전트\\subtitle_agent.py를 확인하세요.
 - tools/video_agent/subtitle_agent.py는 전사 세그먼트가 생성될 때마다 raw_transcribe 진행률을 갱신하도록 되어 있으니, 진행률 표시가 필요한 작업에서는 이 내부 스크립트를 우선하세요.
+- 작업 시작 전 `python tools/video_agent/subtitle_agent.py prepare --source "{source_path}" --workspace-dir "{workspace_root}"`로 새 작업 폴더를 만들고 요청 영상 파일을 그 폴더 안으로 복사하세요.
+- prepare가 출력한 "준비된 작업 경로"를 이후 모든 subtitle_agent.py 명령의 `--base-dir` 값으로 사용하세요.
+- 전사 완료 후 내부 스크립트가 전사록의 유의미한 문장과 핵심어를 기준으로 작업 폴더명, 영상 파일명, 원본 전사 파일명을 공통 stem으로 확정합니다. 폴더명이나 파일명이 바뀌면 `video_status.json`의 `workspace_path` / `source_path` / `current_file`에 기록된 새 경로로 이후 단계(`review`, `diarize`, `preview`, `hardcode`, `final`)를 계속하세요.
+- 전사록, 품질검토 리포트, ASS/SRT, 미리보기, 하드코딩 결과, 최종 인코딩 파일은 모두 해당 작업 폴더 안에 저장하고, 확정된 공통 stem에 `_review`, `_colored`, `_preview`, `_sub`, `_final` 같은 단계 suffix를 붙이세요. 원본 소스 폴더에는 산출물을 쓰지 마세요.
 - ffmpeg, faster-whisper large-v3, pyannote diarization, subtitle burn-in, final encode 관련 실행 가능성을 확인하세요.
 - 실행 가능한 파이프라인이 없으면 임의 완료 처리하지 말고 필요한 스크립트/의존성/명령을 결과에 명확히 보고하세요.
 - 진행 중에는 video_status.json을 갱신하세요. 형식은 status(active|requested|waiting_preview_review|done|error), progress, current_file, batch_progress, total_files, completed_files, current_process, current_process_label, process_status, message, speaker_count 입니다.
@@ -3531,6 +3554,9 @@ def create_video_encoding_task(data):
 
 소스 경로:
 {source_path}
+
+작업 폴더 루트:
+{workspace_root}
 
 대상 파일 수: {len(files)}
 대상 파일 미리보기:
@@ -3582,11 +3608,13 @@ def create_video_encoding_task(data):
 
 처리 지침:
 1. 소스 경로가 데스크탑 서버 기준 실제 경로인지 다시 확인하세요.
-2. 선택된 단계만 수행하되, 전사 또는 화자분리를 수행했다면 품질검토와 CRATA 용어 교정은 건너뛰지 마세요.
-3. 자막 하드코딩 또는 최종 인코딩 단계가 선택되어 있다면 미리보기 검수는 필수입니다.
-4. 현재 작업 안에서 사용자 승인을 받을 수 없으면 미리보기 생성 후 확인 대기 상태로 멈추고, 최종 인코딩은 다음 승인 작업에서 진행하세요.
-5. 결과 파일 경로와 실패한 파일이 있으면 실패 원인을 남기세요.
-6. 완료 후 편집이 필요한 결과물은 처리관리/video_edit_queue.json에 pending_edit 항목으로 추가하세요.
+2. 먼저 prepare 명령으로 작업 폴더를 만들고 요청 영상 파일을 복사하세요. 이후 원본 경로가 아니라 prepare 결과 경로를 기준으로 처리하세요.
+3. 전사 단계가 끝나면 전사록 기준으로 확정된 새 폴더/파일 경로를 확인하고, 이후 명령은 그 새 폴더 경로를 `--base-dir`로 넘기세요.
+4. 선택된 단계만 수행하되, 전사 또는 화자분리를 수행했다면 품질검토와 CRATA 용어 교정은 건너뛰지 마세요.
+5. 자막 하드코딩 또는 최종 인코딩 단계가 선택되어 있다면 미리보기 검수는 필수입니다.
+6. 현재 작업 안에서 사용자 승인을 받을 수 없으면 미리보기 생성 후 확인 대기 상태로 멈추고, 최종 인코딩은 다음 승인 작업에서 진행하세요.
+7. 결과 파일 경로와 실패한 파일이 있으면 실패 원인을 남기세요.
+8. 완료 후 편집이 필요한 결과물은 처리관리/video_edit_queue.json에 pending_edit 항목으로 추가하세요.
 """
 
     task, _ = save_task_request({
@@ -3602,6 +3630,7 @@ def create_video_encoding_task(data):
         'categoryName': '영상/미디어',
         'categoryColor': 'red',
         'videoSourcePath': source_path,
+        'videoWorkspaceRoot': str(workspace_root),
         'videoFileCount': len(files),
         'videoSteps': step_labels,
         'videoPreset': preset,

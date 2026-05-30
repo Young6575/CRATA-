@@ -2,8 +2,9 @@
 subtitle_agent.py — 강의 영상 자동 자막 에이전트
 
 사용법:
+  python subtitle_agent.py prepare --source "D:/source/sample.mp4" --workspace-dir "D:/CRATA_Video_Work"
   python subtitle_agent.py status       # 현재 처리 상태
-  python subtitle_agent.py transcribe   # 1단계: SRT 파일 생성 (로컬 Whisper large-v3)
+  python subtitle_agent.py transcribe --base-dir "D:/CRATA_Video_Work/_staging_..."   # 1단계: SRT 파일 생성
   python subtitle_agent.py review       # 2단계: 자막 품질 검토
   python subtitle_agent.py diarize      # 3단계: 화자분리 → ASS 파일 생성 (색상 구분)
   python subtitle_agent.py hardcode     # 4단계: 자막을 영상에 하드코딩
@@ -38,7 +39,42 @@ from pathlib import Path
 
 # ── 기본 설정 ─────────────────────────────────────────────────────────────────
 
-BASE_DIR = Path(r"H:\Q&A 강의 영상")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _load_video_settings() -> dict:
+    settings_path = PROJECT_ROOT / "처리관리" / "local_settings.json"
+    try:
+        settings = json.loads(settings_path.read_text(encoding="utf-8"))
+        video = settings.get("video") if isinstance(settings.get("video"), dict) else {}
+        return video if isinstance(video, dict) else {}
+    except Exception:
+        return {}
+
+
+def _default_base_dir() -> Path:
+    env_path = os.environ.get("CRATA_VIDEO_BASE_DIR") or os.environ.get("CRATA_VIDEO_SOURCE_DIR")
+    if env_path:
+        return Path(env_path).expanduser()
+    video_settings = _load_video_settings()
+    source_dirs = video_settings.get("source_dirs")
+    if isinstance(source_dirs, list) and source_dirs:
+        return Path(str(source_dirs[0])).expanduser()
+    return Path(r"H:\Q&A 강의 영상")
+
+
+def default_workspace_root() -> Path:
+    env_path = os.environ.get("CRATA_VIDEO_WORKSPACE_DIR")
+    if env_path:
+        return Path(env_path).expanduser()
+    video_settings = _load_video_settings()
+    configured = video_settings.get("workspace_dir") or video_settings.get("work_dir")
+    if configured:
+        return Path(str(configured)).expanduser()
+    return BASE_DIR
+
+
+BASE_DIR = _default_base_dir()
 VIDEO_EXTENSIONS = {".mxf", ".mp4", ".mov", ".avi", ".mkv"}
 SKIP_KEYWORDS = ("_vrew", "_sub", "_final", "자막포함", "preview_photo", "_proxy")
 LANGUAGE      = "ko"
@@ -47,9 +83,9 @@ WHISPER_DEVICE      = "cuda"     # GPU 없으면 "cpu"로 변경
 WHISPER_COMPUTE     = "float16"  # CPU면 "int8"로 변경
 
 HF_TOKEN = os.environ.get("HF_TOKEN", "")  # $env:HF_TOKEN = 'hf_...' 로 설정
+WORKSPACE_MARKER = ".crata_video_workspace.json"
 
 # ── 대시보드 상태 파일 경로 ────────────────────────────────────────────────────
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
 STATUS_FILE: Path | None = Path(os.environ.get("CRATA_VIDEO_STATUS_FILE") or PROJECT_ROOT / "video_status.json")
 LEGACY_STATUS_FILE: Path | None = Path(r"C:\Users\wnsdu\OneDrive\대시보드\video_status.json")
 PROCESS_ID_BY_TASK = {
@@ -81,6 +117,15 @@ DEFAULT_SUBTITLE_STYLE = {
     "speaker_colors": False,
 }
 VISIBLE_SPEAKER_PREFIX = re.compile(r"^\s*(?:\[(?:강사|질문자|화자\s*\d+|SPEAKER[_\s-]*\d+)\]|(?:강사|질문자|화자\s*\d+|SPEAKER[_\s-]*\d+)\s*[:：])\s*", re.IGNORECASE)
+NAMING_KEYWORDS = (
+    "CRATA", "크라타", "문제해결", "문제 해결", "자기효능감", "자기 효능감", "개인행동", "동기",
+    "검사", "결과지", "역량", "중심역량", "핵심역량", "성장역량", "잠재역량", "유형", "행동유형",
+    "조직", "인지", "행동", "강의", "수업", "설명", "질문", "답변",
+)
+NAMING_FILLERS = (
+    "네", "예", "음", "어", "자", "그", "저", "이제", "그러면", "아", "일단", "뭐", "약간",
+    "여러분", "안녕하세요", "시작하겠습니다", "시작하겠습니다.", "보겠습니다", "해볼게요",
+)
 
 # ── 사진 오버레이 설정 ─────────────────────────────────────────────────────────
 # preview 명령으로 확인 후 값을 조정하세요
@@ -157,6 +202,282 @@ def clean_visible_subtitle_text(text: str) -> str:
         cleaned = re.sub(r"</?font[^>]*>", "", line, flags=re.IGNORECASE)
         lines.append(VISIBLE_SPEAKER_PREFIX.sub("", cleaned).strip())
     return "\n".join(line for line in lines if line).strip()
+
+
+def safe_folder_segment(value: str, fallback: str = "video") -> str:
+    text = str(value or "").strip()
+    text = re.sub(r"[<>:\"/\\|?*\x00-\x1f]+", "_", text)
+    text = re.sub(r"\s+", " ", text).strip(" .")
+    text = re.sub(r"_+", "_", text)
+    if len(text) > 56:
+        text = text[:56].rstrip(" .")
+    return text or fallback
+
+
+def unique_directory(parent: Path, name: str) -> Path:
+    parent.mkdir(parents=True, exist_ok=True)
+    base = safe_folder_segment(name)
+    candidate = parent / base
+    if not candidate.exists():
+        return candidate
+    for idx in range(2, 1000):
+        candidate = parent / f"{base}_{idx:02d}"
+        if not candidate.exists():
+            return candidate
+    return parent / f"{base}_{int(time.time())}"
+
+
+def safe_video_filename(path: Path) -> str:
+    name = re.sub(r"[<>:\"/\\|?*\x00-\x1f]+", "_", path.name).strip(" ._")
+    return name or f"video{path.suffix.lower() or '.mp4'}"
+
+
+def unique_file_path(path: Path) -> Path:
+    if not path.exists():
+        return path
+    for idx in range(2, 1000):
+        candidate = path.with_name(f"{path.stem}_{idx:02d}{path.suffix}")
+        if not candidate.exists():
+            return candidate
+    return path.with_name(f"{path.stem}_{int(time.time())}{path.suffix}")
+
+
+def collect_source_video_files(source: Path) -> list[Path]:
+    if source.is_file():
+        return [source] if source.suffix.lower() in VIDEO_EXTENSIONS else []
+    if not source.is_dir():
+        return []
+    files = []
+    for path in sorted(source.rglob("*")):
+        if not path.is_file() or path.suffix.lower() not in VIDEO_EXTENSIONS:
+            continue
+        if any(part.startswith("$") or part.startswith(".") for part in path.parts):
+            continue
+        if any(kw in path.stem for kw in SKIP_KEYWORDS):
+            continue
+        files.append(path)
+    return files
+
+
+def workspace_marker_path(folder: Path) -> Path:
+    return folder / WORKSPACE_MARKER
+
+
+def write_workspace_marker(folder: Path, data: dict):
+    marker = workspace_marker_path(folder)
+    payload = {
+        "created_at": _now_iso(),
+        **data,
+    }
+    marker.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def read_workspace_marker(folder: Path) -> dict:
+    marker = workspace_marker_path(folder)
+    if not marker.exists():
+        return {}
+    try:
+        data = json.loads(marker.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def prepare_workspace_from_source(source_raw: str, workspace_raw: str = "") -> Path:
+    source = Path(source_raw).expanduser().resolve()
+    if not source.exists():
+        raise FileNotFoundError(f"소스 경로가 없습니다: {source}")
+
+    workspace_root = Path(workspace_raw).expanduser() if workspace_raw else default_workspace_root()
+    workspace_root = workspace_root.resolve()
+    workspace_root.mkdir(parents=True, exist_ok=True)
+
+    files = collect_source_video_files(source)
+    if not files:
+        raise RuntimeError("준비할 영상 파일이 없습니다.")
+
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    source_name = source.stem if source.is_file() else source.name
+
+    if len(files) == 1:
+        target_base = unique_directory(workspace_root, f"_staging_{stamp}_{safe_folder_segment(source_name)}")
+        targets = [(files[0], target_base)]
+        prepared_base = target_base
+    else:
+        batch_base = unique_directory(workspace_root, f"_batch_{stamp}_{safe_folder_segment(source_name)}")
+        targets = []
+        for src in files:
+            folder = unique_directory(batch_base, f"_staging_{safe_folder_segment(src.stem)}")
+            targets.append((src, folder))
+        prepared_base = batch_base
+
+    copied = []
+    for src, folder in targets:
+        folder.mkdir(parents=True, exist_ok=True)
+        dest = folder / safe_video_filename(src)
+        if src.resolve() != dest.resolve():
+            shutil.copy2(src, dest)
+        write_workspace_marker(folder, {
+            "status": "staging",
+            "original_path": str(src),
+            "video_path": str(dest),
+            "workspace_root": str(workspace_root),
+            "naming_rule": "transcript_based_folder_and_file_names_after_raw_transcribe",
+        })
+        copied.append(str(dest))
+
+    write_status({
+        "status": "active",
+        "progress": 0,
+        "progress_pct": 0,
+        "workspace_root": str(workspace_root),
+        "workspace_path": str(prepared_base),
+        "prepared_files": copied,
+        "original_source_path": str(source),
+        "message": "영상 작업 폴더 준비 완료. 이후 명령은 이 경로를 --base-dir로 사용하세요.",
+    })
+    return prepared_base
+
+
+def normalize_transcript_title_text(text: str) -> str:
+    text = re.sub(r"\([^)]{1,20}\)", " ", str(text or ""))
+    text = re.sub(r"\[[^\]]{1,20}\]", " ", text)
+    text = re.sub(r"[`~!@#$%^&*+=|\\{}<>]", " ", text)
+    text = re.sub(r"\s+", " ", text).strip(" .,;:!?，。")
+    words = text.split()
+    while words and words[0] in NAMING_FILLERS:
+        words.pop(0)
+    text = " ".join(words).strip(" .,;:!?，。")
+    return text
+
+
+def score_transcript_title_candidate(text: str, index: int) -> float:
+    if not text:
+        return -1000
+    keyword_score = sum(1 for keyword in NAMING_KEYWORDS if keyword.lower() in text.lower()) * 14
+    length = len(text)
+    length_score = min(length, 54) * 0.7
+    early_score = max(0, 36 - index)
+    filler_penalty = sum(1 for filler in NAMING_FILLERS if text == filler or text.startswith(f"{filler} ")) * 12
+    too_short_penalty = 30 if length < 8 else 0
+    too_long_penalty = max(0, length - 70) * 0.4
+    return keyword_score + length_score + early_score - filler_penalty - too_short_penalty - too_long_penalty
+
+
+def transcript_naming_from_srt(srt_path: Path, video: Path) -> dict:
+    try:
+        segments = read_srt(srt_path)
+    except Exception:
+        segments = []
+
+    candidates = []
+    keyword_hits = []
+    for idx, seg in enumerate(segments[:48]):
+        text = normalize_transcript_title_text(clean_visible_subtitle_text(seg.get("text", "")))
+        if len(text) < 3:
+            continue
+        for keyword in NAMING_KEYWORDS:
+            if keyword.lower() in text.lower() and keyword not in keyword_hits:
+                keyword_hits.append(keyword)
+        candidates.append((score_transcript_title_candidate(text, idx), idx, text))
+
+    if candidates:
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        title = candidates[0][2]
+    else:
+        title = ""
+
+    if not title:
+        title = video.stem
+
+    title = safe_folder_segment(title, video.stem)
+    file_stem = safe_folder_segment(title, video.stem)
+    stamp = datetime.now().strftime("%Y%m%d")
+    folder_name = safe_folder_segment(f"{stamp}_{title}", f"{stamp}_{video.stem}")
+    return {
+        "title": title,
+        "file_stem": file_stem,
+        "folder_name": folder_name,
+        "keywords": keyword_hits[:8],
+        "candidate_count": len(candidates),
+    }
+
+
+def rename_workspace_files(folder: Path, old_stem: str, new_stem: str) -> dict[str, str]:
+    if not old_stem or not new_stem or old_stem == new_stem:
+        return {}
+
+    renamed = {}
+    candidates = []
+    for path in folder.iterdir():
+        if not path.is_file():
+            continue
+        if path.name == WORKSPACE_MARKER:
+            continue
+        if path.stem == old_stem or path.stem.startswith(f"{old_stem}_"):
+            candidates.append(path)
+
+    for path in sorted(candidates, key=lambda p: len(p.name), reverse=True):
+        suffix_part = path.stem[len(old_stem):]
+        target = path.with_name(f"{new_stem}{suffix_part}{path.suffix}")
+        if target.exists() and target.resolve() != path.resolve():
+            target = unique_file_path(target)
+        if target.resolve() == path.resolve():
+            continue
+        path.rename(target)
+        renamed[str(path)] = str(target)
+    return renamed
+
+
+def finalize_workspace_folder(video: Path, srt_path: Path) -> tuple[Path, Path]:
+    folder = video.parent
+    marker = read_workspace_marker(folder)
+    staging = folder.name.startswith("_staging_") or bool(marker)
+    if not staging:
+        return video, srt_path
+    existing_naming = marker.get("naming") if isinstance(marker.get("naming"), dict) else {}
+    if marker.get("status") == "finalized" and existing_naming.get("file_stem") == video.stem:
+        return video, srt_path
+
+    naming = transcript_naming_from_srt(srt_path, video)
+    target = folder if folder.name == naming["folder_name"] else unique_directory(folder.parent, naming["folder_name"])
+    if target.resolve() == folder.resolve():
+        target = folder
+    else:
+        try:
+            folder.rename(target)
+        except Exception as exc:
+            print(f"  [경고] 작업 폴더 이름 변경 실패: {exc}")
+            target = folder
+
+    old_video = target / video.name if target != folder else video
+    old_srt = target / srt_path.name if target != folder else srt_path
+    renamed = rename_workspace_files(target, old_video.stem, naming["file_stem"])
+    new_video = Path(renamed.get(str(old_video), str(old_video)))
+    new_srt = Path(renamed.get(str(old_srt), str(old_srt)))
+    marker_data = {
+        **marker,
+        "status": "finalized",
+        "finalized_at": _now_iso(),
+        "name_source": "raw_transcript_analysis",
+        "naming": naming,
+        "folder_path": str(target),
+        "video_path": str(new_video),
+        "transcript_path": str(new_srt),
+        "renamed_files": renamed,
+    }
+    write_workspace_marker(target, marker_data)
+    write_status({
+        "workspace_path": str(target),
+        "source_path": str(target),
+        "current_file": str(new_video),
+        "renamed_files": renamed,
+        "message": f"전사록 기준 이름 확정: {target.name} / {new_video.name}",
+    })
+    print(f"  → 전사록 기준 이름 확정: {target}")
+    print(f"  → 영상 파일명: {new_video.name}")
+    print(f"  → 전사 파일명: {new_srt.name}")
+    return new_video, new_srt
 
 
 def prepare_subtitle_for_display(subtitle: Path) -> Path:
@@ -947,7 +1268,7 @@ def cmd_preview():
     item     = ready[0]
     video    = item["video"]
     subtitle = item["ass"] if item["has_ass"] else item["srt"]
-    out_path = BASE_DIR / "preview_photo.mp4"
+    out_path = video.with_name(video.stem + "_preview.mp4")
 
     print(f"\n미리보기 생성 중: {video.parent.name}/{video.name}")
     print(f"  사진:  {PHOTO_PATH.name}")
@@ -1063,6 +1384,12 @@ def cmd_final(yes: bool = False):
         try:
             _hardcode_with_photo(video, subtitle, out_path)
             completed_names.append(label)
+            add_process_result("final_encode", {
+                "title": "최종 인코딩 결과",
+                "path": str(out_path),
+                "kind": "최종 영상",
+                "viewer": "video",
+            })
             write_status({"progress_pct": 100, "completed": completed_names})
             print(f"  → 완료: {out_path.name}")
         except Exception as e:
@@ -1149,6 +1476,12 @@ def cmd_hardcode(yes: bool = False):
         try:
             out = hardcode_subtitles(video, subtitle)
             completed_names.append(label)
+            add_process_result("burnin", {
+                "title": "자막 하드코딩 결과",
+                "path": str(out),
+                "kind": "자막 하드코딩",
+                "viewer": "video",
+            })
             write_status({"progress_pct": 100, "completed": completed_names})
             print(f"  → 완료: {out.name}")
         except Exception as e:
@@ -1223,6 +1556,8 @@ def cmd_transcribe():
             print("완료")
 
             srt.write_text(srt_content, encoding="utf-8")
+            video, srt = finalize_workspace_folder(video, srt)
+            label = f"{video.parent.name}/{video.name}"
             completed_names.append(label)
             add_process_result("raw_transcribe", {
                 "title": "원본 전사록",
@@ -1261,9 +1596,23 @@ def cmd_status():
     print()
 
 
+def cmd_prepare(source_path: str = "", workspace_dir: str = ""):
+    if not source_path:
+        print("사용법: python subtitle_agent.py prepare --source <영상 파일 또는 폴더> [--workspace-dir <작업 루트>]")
+        sys.exit(1)
+    try:
+        prepared = prepare_workspace_from_source(source_path, workspace_dir)
+    except Exception as exc:
+        print(f"[오류] 작업 폴더 준비 실패: {exc}")
+        sys.exit(1)
+    print(f"준비된 작업 경로: {prepared}")
+    print("다음 명령부터 이 경로를 --base-dir 값으로 사용하세요.")
+
+
 # ── 진입점 ─────────────────────────────────────────────────────────────────────
 
 COMMANDS = {
+    "prepare":    cmd_prepare,
     "transcribe": cmd_transcribe,
     "review":     cmd_review,
     "diarize":    cmd_diarize,
@@ -1276,17 +1625,35 @@ COMMANDS = {
 # 확인 프롬프트 없이 바로 실행하는 커맨드 목록
 YES_SUPPORTED = {"diarize", "hardcode", "final"}
 
+
+def pop_option(args: list[str], name: str) -> str:
+    if name not in args:
+        return ""
+    idx = args.index(name)
+    args.pop(idx)
+    if idx >= len(args):
+        return ""
+    return args.pop(idx)
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     yes_flag = "--yes" in args or "-y" in args
     args = [a for a in args if a not in ("--yes", "-y")]
+    source_arg = pop_option(args, "--source")
+    workspace_arg = pop_option(args, "--workspace-dir")
+    base_dir_arg = pop_option(args, "--base-dir")
+    if base_dir_arg:
+        BASE_DIR = Path(base_dir_arg).expanduser().resolve()
 
     cmd = args[0] if args else "status"
     if cmd not in COMMANDS:
-        print(f"사용법: python subtitle_agent.py [{'|'.join(COMMANDS)}] [--yes]")
+        print(f"사용법: python subtitle_agent.py [{'|'.join(COMMANDS)}] [--base-dir <작업 폴더>] [--yes]")
         sys.exit(1)
 
-    if yes_flag and cmd in YES_SUPPORTED:
+    if cmd == "prepare":
+        cmd_prepare(source_arg, workspace_arg)
+    elif yes_flag and cmd in YES_SUPPORTED:
         COMMANDS[cmd](yes=True)
     else:
         COMMANDS[cmd]()

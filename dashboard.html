@@ -8179,7 +8179,7 @@ body:not([data-page="home"]) .calendar-day.selected {
     <div class="page" id="page-video">
       <div style="margin-bottom: 10px;">
         <h2 style="font-size: 20px; font-weight: 700; color: var(--text-white); font-family: 'Outfit', sans-serif;">자동 자막 편집 및 인코딩</h2>
-        <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">비디오 파일의 전사, 화자 분리, 자막 합치기 및 렌더링 인코딩 파이프라인을 구동하고 모니터링합니다.</p>
+        <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">비디오 파일을 새 작업 폴더에 모아 전사, 화자 분리, 자막 합치기 및 렌더링 인코딩 파이프라인을 구동하고 모니터링합니다.</p>
       </div>
 
       <!-- 인코딩 시작 카드 -->
@@ -8190,7 +8190,7 @@ body:not([data-page="home"]) .calendar-day.selected {
           <div style="display: grid; grid-template-columns: minmax(0,1fr) auto auto auto auto; gap: 12px; align-items: center;">
             <div style="position: relative; display: flex; align-items: center;">
               <span style="position: absolute; left: 12px; font-family: var(--font-mono); color: var(--text-muted); font-size: 13px;">$</span>
-              <input type="text" id="video-path-input" placeholder="데스크탑 서버의 영상 폴더 또는 파일 경로... (예: D:/CRATA_Video_Work/source)" style="width: 100%; padding: 10px 14px 10px 28px; border-radius: var(--radius-md); background: var(--bg-input); border: 1px solid var(--border); color: var(--text-white); font-size: 13px; font-family: var(--font-mono); outline: none; transition: var(--transition);" onfocus="this.style.borderColor='var(--border-focus)'; this.style.backgroundColor='var(--bg-input-focus)'" onblur="this.style.borderColor='var(--border)'; this.style.backgroundColor='var(--bg-input)'">
+              <input type="text" id="video-path-input" placeholder="원본 영상 폴더 또는 파일 경로... 전사록 기준으로 폴더·영상·전사 파일명이 정리됩니다." style="width: 100%; padding: 10px 14px 10px 28px; border-radius: var(--radius-md); background: var(--bg-input); border: 1px solid var(--border); color: var(--text-white); font-size: 13px; font-family: var(--font-mono); outline: none; transition: var(--transition);" onfocus="this.style.borderColor='var(--border-focus)'; this.style.backgroundColor='var(--bg-input-focus)'" onblur="this.style.borderColor='var(--border)'; this.style.backgroundColor='var(--bg-input)'">
             </div>
             <button onclick="document.getElementById('video-encoding-upload-input')?.click()" style="padding: 10px 14px; border-radius: var(--radius-md); background: var(--bg-input); border: 1px solid var(--border); color: var(--text-hover); font-size: 13px; font-weight: 700; cursor: pointer; transition: var(--transition); white-space: nowrap;">
               현재 기기에서 선택
