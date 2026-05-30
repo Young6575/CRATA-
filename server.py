@@ -2160,6 +2160,16 @@ def terminate_process_tree(pid):
         return False, str(exc)
 
 
+def worker_process_kwargs():
+    if os.name != 'nt':
+        return {}
+    flags = (
+        getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+        | getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0)
+    )
+    return {'creationflags': flags} if flags else {}
+
+
 def task_is_cancelled(fpath):
     try:
         task = read_json_file(fpath, {})
@@ -2586,6 +2596,7 @@ def run_codex_task(fpath, claude_error='', claude_output='', fallback=False):
             errors='replace',
             bufsize=1,
             env=env,
+            **worker_process_kwargs(),
         )
         proc.stdin.write(prompt)
         proc.stdin.close()
@@ -2766,6 +2777,7 @@ def run_claude_task(fpath):
             errors='replace',
             bufsize=1,
             env=env,
+            **worker_process_kwargs(),
         )
     except Exception as exc:
         error_msg = f'Claude CLI 실행 실패: {exc}'

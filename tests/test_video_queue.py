@@ -1,4 +1,5 @@
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -211,6 +212,39 @@ class VideoQueueTests(unittest.TestCase):
         updated = json.loads(current.read_text(encoding="utf-8"))
         self.assertEqual(updated["status"], "waiting_review")
         self.assertEqual(updated["statusLbl"], "확인 대기")
+
+    def test_codex_video_worker_uses_isolated_windows_process_group(self):
+        task = self.write_task("task_worker.json", status="pending", desc="video", runnerPreference="codex")
+        create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+        create_new_process_group = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
+
+        class FakeStdin:
+            def write(self, _text):
+                return None
+
+            def close(self):
+                return None
+
+        class FakeProcess:
+            pid = 4321
+            stdin = FakeStdin()
+            stdout = []
+
+            def wait(self):
+                return 0
+
+        with mock.patch.object(server, "resolve_codex_command", return_value="codex"), \
+                mock.patch.object(server, "continue_video_queue_after_task"), \
+                mock.patch.object(server.os, "name", "nt"), \
+                mock.patch.object(server.subprocess, "CREATE_NO_WINDOW", create_no_window, create=True), \
+                mock.patch.object(server.subprocess, "CREATE_NEW_PROCESS_GROUP", create_new_process_group, create=True), \
+                mock.patch.object(server.subprocess, "Popen", return_value=FakeProcess()) as popen:
+            server.run_codex_task(task)
+
+        kwargs = popen.call_args.kwargs
+        flags = kwargs.get("creationflags", 0)
+        self.assertTrue(flags & create_new_process_group)
+        self.assertTrue(flags & create_no_window)
 
 
 if __name__ == "__main__":
