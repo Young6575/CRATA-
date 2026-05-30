@@ -311,20 +311,21 @@ def prepare_workspace_from_source(source_raw: str, workspace_raw: str = "") -> P
             targets.append((src, folder))
         prepared_base = batch_base
 
-    copied = []
+    moved = []
     for src, folder in targets:
         folder.mkdir(parents=True, exist_ok=True)
         dest = folder / safe_video_filename(src)
         if src.resolve() != dest.resolve():
-            shutil.copy2(src, dest)
+            shutil.move(str(src), str(dest))
         write_workspace_marker(folder, {
             "status": "staging",
             "original_path": str(src),
+            "moved_from": str(src),
             "video_path": str(dest),
             "workspace_root": str(workspace_root),
             "naming_rule": "transcript_based_folder_and_file_names_after_raw_transcribe",
         })
-        copied.append(str(dest))
+        moved.append(str(dest))
 
     write_status({
         "status": "active",
@@ -332,9 +333,10 @@ def prepare_workspace_from_source(source_raw: str, workspace_raw: str = "") -> P
         "progress_pct": 0,
         "workspace_root": str(workspace_root),
         "workspace_path": str(prepared_base),
-        "prepared_files": copied,
+        "prepared_files": moved,
+        "moved_files": moved,
         "original_source_path": str(source),
-        "message": "영상 작업 폴더 준비 완료. 이후 명령은 이 경로를 --base-dir로 사용하세요.",
+        "message": "영상 원본을 작업 폴더로 이동했습니다. 이후 명령은 이 경로를 --base-dir로 사용하세요.",
     })
     return prepared_base
 
