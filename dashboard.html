@@ -13967,10 +13967,9 @@ function selectVideoProcess(id) {
   if (selectedVideoArtifact.stepId && selectedVideoArtifact.stepId !== selectedVideoProcessId) {
     selectedVideoArtifact = emptySelectedVideoArtifact();
   }
-  const completedFiles = Array.isArray(latestVideoStatusData.completed_files) ? latestVideoStatusData.completed_files : (Array.isArray(latestVideoStatusData.completed) ? latestVideoStatusData.completed : []);
-  const completedCount = Number.isFinite(Number(latestVideoStatusData.done)) ? Number(latestVideoStatusData.done) : completedFiles.length;
-  const totalCount = Number(latestVideoStatusData.total_files ?? latestVideoStatusData.total ?? 0);
-  renderVideoProcessFlow(latestVideoStatusData, totalCount, completedCount);
+  const activeData = activeVideoProcessData(latestVideoStatusData);
+  const { completedCount, totalCount } = activeVideoCounts(activeData);
+  renderVideoProcessFlow(activeData, totalCount, completedCount);
 }
 
 function videoArtifactEntries(data, stepId) {
@@ -14208,14 +14207,14 @@ function mergeTranscriptSpeakerRows(rows, speakerRows) {
 
 function setFinalTranscriptSearch(value) {
   finalTranscriptState.query = String(value || '').trim();
-  renderFinalTranscriptReview(latestVideoStatusData);
+  renderFinalTranscriptReview(activeVideoProcessData(latestVideoStatusData));
 }
 
 function adjustFinalTranscriptFont(delta) {
   const next = Math.max(14, Math.min(24, (finalTranscriptState.fontSize || 16) + delta));
   finalTranscriptState.fontSize = next;
   localStorage.setItem('crataFinalTranscriptFontSize', String(next));
-  renderFinalTranscriptReview(latestVideoStatusData);
+  renderFinalTranscriptReview(activeVideoProcessData(latestVideoStatusData));
 }
 
 async function loadFinalTranscriptArtifact(artifact) {
@@ -14225,7 +14224,7 @@ async function loadFinalTranscriptArtifact(artifact) {
   finalTranscriptState.error = '';
   finalTranscriptState.speakerContent = '';
   finalTranscriptState.speakerPath = '';
-  renderFinalTranscriptReview(latestVideoStatusData);
+  renderFinalTranscriptReview(activeVideoProcessData(latestVideoStatusData));
   try {
     const res = await fetchWithTimeout(`${SERVER_URL}/api/video/artifact?path=${encodeURIComponent(targetPath)}`, {}, 12000);
     const data = await res.json();
@@ -14243,7 +14242,7 @@ async function loadFinalTranscriptArtifact(artifact) {
     finalTranscriptState.error = error.message || '최종 전사록을 읽지 못했습니다.';
     finalTranscriptState.truncated = false;
   }
-  renderFinalTranscriptReview(latestVideoStatusData);
+  renderFinalTranscriptReview(activeVideoProcessData(latestVideoStatusData));
 }
 
 async function loadFinalTranscriptSpeakerCompanion(artifact) {
@@ -14268,7 +14267,8 @@ async function loadFinalTranscriptSpeakerCompanion(artifact) {
 }
 
 function reloadFinalTranscriptArtifact() {
-  const artifact = finalTranscriptState.artifact || pickFinalTranscriptArtifact(latestVideoStatusData);
+  const activeData = activeVideoProcessData(latestVideoStatusData);
+  const artifact = finalTranscriptState.artifact || pickFinalTranscriptArtifact(activeData);
   if (!artifact?.path) {
     showToast('아직 열 수 있는 전사록 산출물이 없습니다.', 'warning');
     return;
@@ -14400,7 +14400,8 @@ function renderFinalTranscriptReview(data = latestVideoStatusData) {
 async function submitVideoTranscriptReviewNote() {
   const input = document.getElementById('video-transcript-review-input');
   const note = String(input?.value || '').trim();
-  const artifact = finalTranscriptState.artifact || pickFinalTranscriptArtifact(latestVideoStatusData);
+  const activeData = activeVideoProcessData(latestVideoStatusData);
+  const artifact = finalTranscriptState.artifact || pickFinalTranscriptArtifact(activeData);
   if (!artifact?.path) {
     showToast('수정 요청을 연결할 전사록 산출물이 없습니다.', 'warning');
     return;
@@ -14423,7 +14424,7 @@ async function submitVideoTranscriptReviewNote() {
       artifactPath: artifact.path,
       artifactTitle: artifact.title || artifact.kind || finalTranscriptCandidateLabel(artifact),
       processId: artifact.stepId,
-      sourcePath: latestVideoStatusData?.source_path || latestVideoStatusData?.current_file || '',
+      sourcePath: activeData?.source_path || activeData?.current_file || '',
       runnerPreference: 'codex',
     }, 20000);
     if (!saved?.ok) throw new Error(saved?.error || '작업 등록에 실패했습니다.');
@@ -14451,10 +14452,9 @@ async function submitVideoTranscriptReviewNote() {
 
 async function viewVideoArtifact(path, title, stepId) {
   selectedVideoArtifact = { stepId, path, title, content: '', loading: true, error: '', truncated: false };
-  const completedFiles = Array.isArray(latestVideoStatusData.completed_files) ? latestVideoStatusData.completed_files : (Array.isArray(latestVideoStatusData.completed) ? latestVideoStatusData.completed : []);
-  const completedCount = Number.isFinite(Number(latestVideoStatusData.done)) ? Number(latestVideoStatusData.done) : completedFiles.length;
-  const totalCount = Number(latestVideoStatusData.total_files ?? latestVideoStatusData.total ?? 0);
-  renderVideoProcessFlow(latestVideoStatusData, totalCount, completedCount);
+  const activeData = activeVideoProcessData(latestVideoStatusData);
+  const { completedCount, totalCount } = activeVideoCounts(activeData);
+  renderVideoProcessFlow(activeData, totalCount, completedCount);
   try {
     const res = await fetchWithTimeout(`${SERVER_URL}/api/video/artifact?path=${encodeURIComponent(path)}`, {}, 10000);
     const data = await res.json();
@@ -14718,7 +14718,7 @@ function renderSelectedVideoArtifact(stepId) {
   const changes = selectedVideoArtifact.loading || selectedVideoArtifact.error
     ? []
     : extractVideoArtifactChanges(selectedVideoArtifact.content || '', selectedVideoArtifact.stepId, artifactEntry);
-  const closeAction = "selectedVideoArtifact={stepId:'',path:'',title:'',content:'',loading:false,error:'',truncated:false}; renderVideoProcessFlow(latestVideoStatusData, Number(latestVideoStatusData.total_files ?? latestVideoStatusData.total ?? 0), Number(latestVideoStatusData.done ?? 0));";
+  const closeAction = "selectedVideoArtifact={stepId:'',path:'',title:'',content:'',loading:false,error:'',truncated:false}; renderSelectedVideoJobMainPanels();";
   const body = selectedVideoArtifact.loading
     ? '<div class="video-artifact-message">결과 파일을 읽는 중입니다.</div>'
     : selectedVideoArtifact.error
@@ -14977,6 +14977,7 @@ function videoQueueTone(item) {
   const status = String(item?.status || '').toLowerCase();
   if (item?.active || ['active', 'pending'].includes(status)) return { color: 'var(--yellow)', border: 'rgba(245,158,11,0.36)', bg: 'rgba(245,158,11,0.06)' };
   if (status === 'queued') return { color: 'var(--blue)', border: 'rgba(59,130,246,0.36)', bg: 'rgba(59,130,246,0.06)' };
+  if (status === 'waiting_review') return { color: 'var(--blue)', border: 'rgba(59,130,246,0.36)', bg: 'rgba(59,130,246,0.06)' };
   if (['done', 'completed'].includes(status)) return { color: 'var(--green)', border: 'rgba(16,185,129,0.32)', bg: 'rgba(16,185,129,0.05)' };
   if (['error', 'cancelled'].includes(status)) return { color: 'var(--red)', border: 'rgba(239,68,68,0.34)', bg: 'rgba(239,68,68,0.05)' };
   return { color: 'var(--text-muted)', border: 'var(--border)', bg: 'rgba(255,255,255,0.012)' };
@@ -14998,7 +14999,15 @@ function videoQueueLabel(item) {
 
 function selectVideoJob(id) {
   selectedVideoJobId = String(id || '');
+  const item = selectedVideoJobItem(latestVideoStatusData);
+  if (item) {
+    const data = videoJobProcessData(item);
+    const steps = videoProcessStepsFromStatus(data);
+    selectedVideoProcessId = currentVideoProcessId(data, steps) || steps[0]?.id || '';
+    selectedVideoArtifact = emptySelectedVideoArtifact();
+  }
   renderVideoJobQueue(latestVideoStatusData?.video_queue || []);
+  renderSelectedVideoJobMainPanels();
 }
 
 function videoJobDisplayStatus(item) {
@@ -15014,6 +15023,118 @@ function videoJobProcessData(item) {
     process_status: item?.process_status && typeof item.process_status === 'object' ? item.process_status : {},
     current_process: item?.current_process || (item?.status === 'queued' ? '' : 'raw_transcribe'),
   };
+}
+
+function selectedVideoJobItem(data = latestVideoStatusData) {
+  const rows = Array.isArray(data?.video_queue) ? data.video_queue : [];
+  return rows.find(item => String(item.id || '') === selectedVideoJobId) || null;
+}
+
+function activeVideoProcessData(data = latestVideoStatusData) {
+  const selected = selectedVideoJobItem(data);
+  return selected ? videoJobProcessData(selected) : (data || {});
+}
+
+function activeVideoCounts(data) {
+  const completedFiles = Array.isArray(data?.completed_files) ? data.completed_files : (Array.isArray(data?.completed) ? data.completed : []);
+  const completedCount = Number.isFinite(Number(data?.done)) ? Number(data.done) : completedFiles.length;
+  const totalCount = Number(data?.total_files ?? data?.total ?? 0);
+  return { completedFiles, completedCount, totalCount };
+}
+
+function renderSelectedVideoJobMainPanels() {
+  const activeData = activeVideoProcessData(latestVideoStatusData);
+  const { completedCount, totalCount } = activeVideoCounts(activeData);
+  renderVideoCurrentSummary(activeData);
+  renderVideoProcessFlow(activeData, totalCount, completedCount, {
+    preserveResultPanel: isVideoArtifactInspectorOpen(),
+  });
+  ensureFinalTranscriptArtifact(activeData);
+}
+
+function renderVideoCurrentSummary(data = {}) {
+  const currentStatusLbl = document.getElementById('video-current-status-lbl');
+  const cancelBtn = document.getElementById('video-cancel-btn');
+  const singlePct = document.getElementById('video-single-pct');
+  const singleBar = document.getElementById('video-single-bar');
+  const currentFileName = document.getElementById('video-current-file-name');
+  const headline = document.getElementById('video-process-headline');
+  const elapsedLbl = document.getElementById('video-time-elapsed-lbl');
+  const navDot = document.getElementById('nav-video-dot');
+  const status = data.status || 'idle';
+  const progress = Number(data.progress ?? data.progress_pct ?? 0);
+  const currentFile = data.current_file || data.source_path || '';
+  const { completedFiles, completedCount, totalCount } = activeVideoCounts(data);
+  const steps = videoProcessStepsFromStatus(data || {});
+  const currentProcessId = currentVideoProcessId(data || {}, steps);
+  const currentProcess = steps.find(step => step.id === currentProcessId);
+  const currentLabel = currentProcess?.label || '대기';
+  const processStatus = data?.process_status && typeof data.process_status === 'object' ? data.process_status : {};
+  const processProgress = Number(processStatus[currentProcessId]?.progress);
+  const activeProgress = Number.isFinite(processProgress) ? processProgress : progress;
+
+  if (currentStatusLbl) currentStatusLbl.textContent = status === 'active'
+    ? '가공 중'
+    : (status === 'requested'
+      ? '요청됨'
+      : (status === 'waiting_preview_review'
+        ? '미리보기 확인 대기'
+        : (status === 'cancelled' ? '중지됨' : (status === 'done' || status === 'completed' ? '완료' : '대기'))));
+  if (cancelBtn) {
+    const cancellable = ['active', 'requested', 'waiting_preview_review'].includes(status);
+    cancelBtn.style.display = cancellable ? 'inline-flex' : 'none';
+    cancelBtn.disabled = !cancellable;
+    cancelBtn.style.opacity = cancellable ? '1' : '0.5';
+  }
+  if (singlePct) singlePct.textContent = Math.round(activeProgress);
+  if (singleBar) singleBar.style.width = `${Math.max(0, Math.min(100, activeProgress))}%`;
+  if (headline) {
+    headline.textContent = status === 'idle'
+      ? '작업 요청 대기 중'
+      : `${currentLabel}${totalCount ? ` · ${completedCount}/${totalCount} 파일` : ''}`;
+  }
+  if (currentFileName) {
+    const resultLine = data.preview_file ? `\n미리보기: ${data.preview_file}` : (completedFiles[0] ? `\n최근 결과: ${completedFiles[completedFiles.length - 1]}` : '');
+    currentFileName.textContent = currentFile ? `${currentFile}${resultLine}` : '작업 요청이 들어오면 파일 경로와 결과 경로가 표시됩니다.';
+  }
+
+  if (status === 'active') {
+    if (navDot) {
+      navDot.style.backgroundColor = 'var(--green)';
+      navDot.style.boxShadow = '0 0 8px var(--green)';
+    }
+    if (elapsedLbl) elapsedLbl.textContent = data.message || `${currentLabel} 진행 중`;
+  } else if (status === 'requested') {
+    if (navDot) {
+      navDot.style.backgroundColor = 'var(--yellow)';
+      navDot.style.boxShadow = '0 0 8px var(--yellow)';
+    }
+    if (elapsedLbl) elapsedLbl.textContent = 'CLI 에이전트 작업으로 등록되었습니다.';
+  } else if (status === 'waiting_preview_review') {
+    if (navDot) {
+      navDot.style.backgroundColor = 'var(--blue)';
+      navDot.style.boxShadow = '0 0 8px var(--blue)';
+    }
+    if (elapsedLbl) elapsedLbl.textContent = `미리보기 검수 대기 중${data.preview_file ? ` | ${data.preview_file}` : ''}`;
+  } else if (status === 'done' || status === 'completed') {
+    if (navDot) {
+      navDot.style.backgroundColor = 'var(--green)';
+      navDot.style.boxShadow = '0 0 8px var(--green)';
+    }
+    if (elapsedLbl) elapsedLbl.textContent = '영상 작업이 완료되었습니다.';
+  } else if (status === 'cancelled') {
+    if (navDot) {
+      navDot.style.backgroundColor = 'var(--red)';
+      navDot.style.boxShadow = '0 0 8px var(--red)';
+    }
+    if (elapsedLbl) elapsedLbl.textContent = data.message || '영상 작업이 중지되었습니다.';
+  } else {
+    if (navDot) {
+      navDot.style.backgroundColor = 'var(--text-muted)';
+      navDot.style.boxShadow = 'none';
+    }
+    if (elapsedLbl) elapsedLbl.textContent = '대기 중';
+  }
 }
 
 function videoJobArtifactEntries(item) {
@@ -15221,6 +15342,8 @@ function pollVideoStatus() {
 
 function updateVideoUI(data) {
   latestVideoStatusData = data || {};
+  renderVideoJobQueue(data?.video_queue || []);
+  const activeData = activeVideoProcessData(latestVideoStatusData);
   const currentStatusLbl = document.getElementById('video-current-status-lbl');
   const cancelBtn = document.getElementById('video-cancel-btn');
   const singlePct = document.getElementById('video-single-pct');
@@ -15231,18 +15354,16 @@ function updateVideoUI(data) {
   const navDot = document.getElementById('nav-video-dot');
   
   // Status KPI indicators
-  const status = data.status || 'idle';
-  const progress = Number(data.progress ?? data.progress_pct ?? 0);
-  const currentFile = data.current_file || '';
-  const batchProgress = Number(data.batch_progress ?? data.progress_pct ?? 0);
-  const completedFiles = Array.isArray(data.completed_files) ? data.completed_files : (Array.isArray(data.completed) ? data.completed : []);
-  const completedCount = Number.isFinite(Number(data.done)) ? Number(data.done) : completedFiles.length;
-  const totalCount = Number(data.total_files ?? data.total ?? 0);
-  const steps = videoProcessStepsFromStatus(data || {});
-  const currentProcessId = currentVideoProcessId(data || {}, steps);
+  const status = activeData.status || 'idle';
+  const progress = Number(activeData.progress ?? activeData.progress_pct ?? 0);
+  const currentFile = activeData.current_file || activeData.source_path || '';
+  const batchProgress = Number(activeData.batch_progress ?? activeData.progress_pct ?? progress);
+  const { completedFiles, completedCount, totalCount } = activeVideoCounts(activeData);
+  const steps = videoProcessStepsFromStatus(activeData || {});
+  const currentProcessId = currentVideoProcessId(activeData || {}, steps);
   const currentProcess = steps.find(step => step.id === currentProcessId);
   const currentLabel = currentProcess?.label || '대기';
-  const processStatus = data?.process_status && typeof data.process_status === 'object' ? data.process_status : {};
+  const processStatus = activeData?.process_status && typeof activeData.process_status === 'object' ? activeData.process_status : {};
   const processProgress = Number(processStatus[currentProcessId]?.progress);
   const activeProgress = Number.isFinite(processProgress) ? processProgress : progress;
   
@@ -15268,7 +15389,7 @@ function updateVideoUI(data) {
       : `${currentLabel}${totalCount ? ` · ${completedCount}/${totalCount} 파일` : ''}`;
   }
   if (currentFileName) {
-    const resultLine = data.preview_file ? `\n미리보기: ${data.preview_file}` : (completedFiles[0] ? `\n최근 결과: ${completedFiles[completedFiles.length - 1]}` : '');
+    const resultLine = activeData.preview_file ? `\n미리보기: ${activeData.preview_file}` : (completedFiles[0] ? `\n최근 결과: ${completedFiles[completedFiles.length - 1]}` : '');
     currentFileName.textContent = currentFile ? `${currentFile}${resultLine}` : '작업 요청이 들어오면 파일 경로와 결과 경로가 표시됩니다.';
   }
   
@@ -15277,7 +15398,7 @@ function updateVideoUI(data) {
       navDot.style.backgroundColor = 'var(--green)';
       navDot.style.boxShadow = '0 0 8px var(--green)';
     }
-    if (elapsedLbl) elapsedLbl.textContent = data.message || `${currentLabel} 진행 중`;
+    if (elapsedLbl) elapsedLbl.textContent = activeData.message || `${currentLabel} 진행 중`;
   } else if (status === 'requested') {
     if (navDot) {
       navDot.style.backgroundColor = 'var(--yellow)';
@@ -15289,7 +15410,7 @@ function updateVideoUI(data) {
       navDot.style.backgroundColor = 'var(--blue)';
       navDot.style.boxShadow = '0 0 8px var(--blue)';
     }
-    if (elapsedLbl) elapsedLbl.textContent = `미리보기 검수 대기 중${data.preview_file ? ` | ${data.preview_file}` : ''}`;
+    if (elapsedLbl) elapsedLbl.textContent = `미리보기 검수 대기 중${activeData.preview_file ? ` | ${activeData.preview_file}` : ''}`;
   } else if (status === 'done' || status === 'completed') {
     if (navDot) {
       navDot.style.backgroundColor = 'var(--green)';
@@ -15301,7 +15422,7 @@ function updateVideoUI(data) {
       navDot.style.backgroundColor = 'var(--red)';
       navDot.style.boxShadow = '0 0 8px var(--red)';
     }
-    if (elapsedLbl) elapsedLbl.textContent = data.message || '영상 작업이 중지되었습니다.';
+    if (elapsedLbl) elapsedLbl.textContent = activeData.message || '영상 작업이 중지되었습니다.';
   } else {
     if (navDot) {
       navDot.style.backgroundColor = 'var(--text-muted)';
@@ -15310,27 +15431,33 @@ function updateVideoUI(data) {
     if (elapsedLbl) elapsedLbl.textContent = '대기 중';
   }
   
-  renderVideoProcessFlow(data, totalCount, completedCount, {
+  renderVideoProcessFlow(activeData, totalCount, completedCount, {
     preserveResultPanel: isVideoArtifactInspectorOpen(),
   });
   renderVideoSystemMetrics(data);
   renderVideoModelStatus(data);
-  renderVideoJobQueue(data?.video_queue || []);
-  ensureFinalTranscriptArtifact(data);
+  ensureFinalTranscriptArtifact(activeData);
   
   // Update dashboard mini tracker too!
   const homeVideoCard = document.getElementById('home-video-card');
   if (homeVideoCard) {
-    const homeSteps = videoProcessStepsFromStatus(data || {});
-    const homeCurrentId = currentVideoProcessId(data || {}, homeSteps);
+    const homeData = data || {};
+    const homeSteps = videoProcessStepsFromStatus(homeData);
+    const homeCurrentId = currentVideoProcessId(homeData, homeSteps);
     const homeCurrentLabel = homeSteps.find(step => step.id === homeCurrentId)?.label || '영상 처리';
-    if (['active', 'requested', 'waiting_preview_review'].includes(status)) {
+    const homeStatus = homeData.status || 'idle';
+    const homeProgress = Number(homeData.batch_progress ?? homeData.progress_pct ?? homeData.progress ?? 0);
+    const homeFile = homeData.current_file || '';
+    const homeCompletedFiles = Array.isArray(homeData.completed_files) ? homeData.completed_files : (Array.isArray(homeData.completed) ? homeData.completed : []);
+    const homeCompletedCount = Number.isFinite(Number(homeData.done)) ? Number(homeData.done) : homeCompletedFiles.length;
+    const homeTotalCount = Number(homeData.total_files ?? homeData.total ?? 0);
+    if (['active', 'requested', 'waiting_preview_review'].includes(homeStatus)) {
       homeVideoCard.style.display = 'block';
-      document.getElementById('home-video-task').textContent = `${homeCurrentLabel} (${completedCount}/${totalCount})`;
-      document.getElementById('home-video-file').textContent = currentFile;
-      document.getElementById('home-video-pct').textContent = `${Math.round(batchProgress)}%`;
-      document.getElementById('home-video-bar').style.width = `${batchProgress}%`;
-      document.getElementById('home-video-files').textContent = `${completedCount}/${totalCount} files`;
+      document.getElementById('home-video-task').textContent = `${homeCurrentLabel} (${homeCompletedCount}/${homeTotalCount})`;
+      document.getElementById('home-video-file').textContent = homeFile;
+      document.getElementById('home-video-pct').textContent = `${Math.round(homeProgress)}%`;
+      document.getElementById('home-video-bar').style.width = `${homeProgress}%`;
+      document.getElementById('home-video-files').textContent = `${homeCompletedCount}/${homeTotalCount} files`;
     } else {
       homeVideoCard.style.display = 'none';
     }
