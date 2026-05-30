@@ -60,16 +60,16 @@ class VideoQueueTests(unittest.TestCase):
         self.assertEqual(updated["status"], "pending")
         self.assertEqual(updated["statusLbl"], "대기 중")
 
-    def test_auto_start_next_video_task_waits_for_preview_confirmation(self):
-        self.write_task("task_waiting.json", status="queued", created_at="2026-05-31T00:00:00")
+    def test_auto_start_next_video_task_can_continue_while_preview_waits(self):
+        queued = self.write_task("task_waiting.json", status="queued", created_at="2026-05-31T00:00:00")
 
         with mock.patch.object(server, "read_video_status", return_value={"status": "waiting_preview_review"}), \
                 mock.patch.object(server, "task_process_alive", return_value=False), \
                 mock.patch.object(server, "start_task_worker") as start_worker:
             selected = server.auto_start_next_video_task()
 
-        self.assertIsNone(selected)
-        start_worker.assert_not_called()
+        self.assertEqual(Path(selected), queued)
+        start_worker.assert_called_once()
 
     def test_continue_video_queue_after_video_task_finishes_starts_next(self):
         current = self.write_task("task_current.json", status="done", created_at="2026-05-31T00:00:00")
@@ -193,9 +193,9 @@ class VideoQueueTests(unittest.TestCase):
         self.assertEqual(updated["videoStatusSnapshot"]["current_process"], "final_encode")
         self.assertEqual(updated["videoStatusSnapshot"]["process_status"]["final_encode"]["progress"], 100)
 
-    def test_continue_video_queue_after_task_marks_preview_waiting_as_user_action(self):
+    def test_continue_video_queue_after_task_marks_preview_waiting_and_starts_next(self):
         current = self.write_task("task_current.json", status="active")
-        self.write_task("task_next.json", status="queued", created_at="2026-05-31T00:01:00")
+        next_task = self.write_task("task_next.json", status="queued", created_at="2026-05-31T00:01:00")
 
         with mock.patch.object(server, "read_video_status", return_value={
                 "status": "waiting_preview_review",
@@ -206,8 +206,8 @@ class VideoQueueTests(unittest.TestCase):
                 mock.patch.object(server, "start_task_worker") as start_worker:
             selected = server.continue_video_queue_after_task(current)
 
-        self.assertIsNone(selected)
-        start_worker.assert_not_called()
+        self.assertEqual(Path(selected), next_task)
+        start_worker.assert_called_once()
         updated = json.loads(current.read_text(encoding="utf-8"))
         self.assertEqual(updated["status"], "waiting_review")
         self.assertEqual(updated["statusLbl"], "확인 대기")

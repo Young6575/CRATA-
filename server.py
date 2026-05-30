@@ -2321,14 +2321,7 @@ def queued_video_task_files():
     return items
 
 
-def video_queue_blocked_by_user_action():
-    status = read_video_status()
-    return status.get('status') == 'waiting_preview_review'
-
-
 def auto_start_next_video_task():
-    if video_queue_blocked_by_user_action():
-        return None
     if should_queue_video_task({'type': 'video_encoding'}):
         return None
     queued = queued_video_task_files()
@@ -2355,8 +2348,6 @@ def continue_video_queue_after_task(fpath):
     if task.get('type') != 'video_encoding':
         return None
     snapshot = record_video_task_status_snapshot(fpath)
-    if snapshot.get('status') == 'waiting_preview_review':
-        return None
     return auto_start_next_video_task()
 
 
