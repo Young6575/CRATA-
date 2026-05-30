@@ -118,9 +118,17 @@ DEFAULT_SUBTITLE_STYLE = {
 }
 VISIBLE_SPEAKER_PREFIX = re.compile(r"^\s*(?:\[(?:강사|질문자|화자\s*\d+|SPEAKER[_\s-]*\d+)\]|(?:강사|질문자|화자\s*\d+|SPEAKER[_\s-]*\d+)\s*[:：])\s*", re.IGNORECASE)
 NAMING_KEYWORDS = (
-    "CRATA", "크라타", "문제해결", "문제 해결", "자기효능감", "자기 효능감", "개인행동", "동기",
+    "CRATA", "크라타", "문제해결방식검사", "문제해결", "문제 해결", "자기효능감검사", "자기효능감", "자기 효능감", "개인행동", "동기",
     "검사", "결과지", "역량", "중심역량", "핵심역량", "성장역량", "잠재역량", "유형", "행동유형",
     "조직", "인지", "행동", "강의", "수업", "설명", "질문", "답변",
+)
+NAMING_TOPIC_TERMS = (
+    "문제해결방식검사", "개인행동동기검사", "자기효능감검사", "성장역량", "중심역량", "핵심역량", "잠재역량",
+    "행동유형", "자기효능감", "문제해결", "개인행동", "동기", "결과지", "CRATA", "크라타",
+)
+NAMING_CONTEXT_TERMS = (
+    ("질의응답", ("질문", "답변", "Q&A", "q&a", "큐앤에이")),
+    ("강의", ("강의", "수업", "설명")),
 )
 NAMING_FILLERS = (
     "네", "예", "음", "어", "자", "그", "저", "이제", "그러면", "아", "일단", "뭐", "약간",
@@ -366,6 +374,65 @@ def score_transcript_title_candidate(text: str, index: int) -> float:
     return keyword_score + length_score + early_score - filler_penalty - too_short_penalty - too_long_penalty
 
 
+def is_sentence_like_title(text: str) -> bool:
+    value = str(text or "").strip()
+    if len(value) > 24:
+        return True
+    return bool(re.search(r"(습니다|합니다|됩니다|입니다|해요|할게요|보겠습니다|말씀드리겠습니다|대해서|통해서|그리고|그러면)", value))
+
+
+def transcript_topic_title(segments: list[dict], fallback: str = "") -> str:
+    scores: dict[str, float] = {}
+    first_seen: dict[str, int] = {}
+    context_hits: dict[str, int] = {}
+
+    for idx, seg in enumerate(segments[:120]):
+        text = normalize_transcript_title_text(clean_visible_subtitle_text(seg.get("text", "")))
+        if not text:
+            continue
+        lowered = text.lower()
+        for term in NAMING_TOPIC_TERMS:
+            if term.lower() not in lowered:
+                continue
+            first_seen.setdefault(term, idx)
+            scores[term] = scores.get(term, 0) + 25 + max(0, 40 - idx) * 0.35 + min(len(term), 12) * 0.6
+        for label, aliases in NAMING_CONTEXT_TERMS:
+            if any(alias.lower() in lowered for alias in aliases):
+                context_hits[label] = context_hits.get(label, 0) + 1
+
+    if not scores:
+        return ""
+
+    ordered = sorted(
+        scores,
+        key=lambda term: (-scores[term], first_seen.get(term, 999), -len(term), term),
+    )
+
+    selected: list[str] = []
+    for term in ordered:
+        if any(term != existing and term in existing for existing in selected):
+            continue
+        if any(existing != term and existing in term for existing in selected):
+            selected = [existing for existing in selected if existing not in term]
+        candidate = "_".join([*selected, term])
+        if len(candidate) <= 24:
+            selected.append(term)
+        if len(selected) >= 3:
+            break
+
+    if len(selected) == 1:
+        for label, count in sorted(context_hits.items(), key=lambda item: -item[1]):
+            candidate = "_".join([selected[0], label])
+            if count >= 1 and len(candidate) <= 24:
+                selected.append(label)
+                break
+
+    title = "_".join(selected).strip("_")
+    if title and len(title) <= 24:
+        return title
+    return safe_folder_segment(fallback or title, fallback or "video")[:24].strip(" _")
+
+
 def transcript_naming_from_srt(srt_path: Path, video: Path) -> dict:
     try:
         segments = read_srt(srt_path)
@@ -383,13 +450,13 @@ def transcript_naming_from_srt(srt_path: Path, video: Path) -> dict:
                 keyword_hits.append(keyword)
         candidates.append((score_transcript_title_candidate(text, idx), idx, text))
 
-    if candidates:
+    title = transcript_topic_title(segments, video.stem)
+
+    if not title and candidates:
         candidates.sort(key=lambda item: item[0], reverse=True)
         title = candidates[0][2]
-    else:
-        title = ""
 
-    if not title:
+    if not title or is_sentence_like_title(title):
         title = video.stem
 
     title = safe_folder_segment(title, video.stem)
@@ -461,7 +528,7 @@ def finalize_workspace_folder(video: Path, srt_path: Path) -> tuple[Path, Path]:
         **marker,
         "status": "finalized",
         "finalized_at": _now_iso(),
-        "name_source": "raw_transcript_analysis",
+        "name_source": "raw_transcript_topic_analysis",
         "naming": naming,
         "folder_path": str(target),
         "video_path": str(new_video),
