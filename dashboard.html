@@ -8297,6 +8297,18 @@ body:not([data-page="home"]) .calendar-day.selected {
         <div id="video-system-metrics" style="display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:8px;"></div>
       </div>
 
+      <!-- 작업 내역 / 대기열 -->
+      <div class="card" style="margin-bottom: 10px; padding: 16px 20px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px;">
+          <div>
+            <div class="card-title" style="margin-bottom:4px;">작업 내역 / 대기열</div>
+            <div style="font-size:12px;color:var(--text-muted);">진행 중인 영상이 있으면 새 요청은 여기서 순서대로 대기합니다.</div>
+          </div>
+          <span id="video-job-queue-count" style="font-size:11px;font-family:var(--font-mono);color:var(--text-muted);padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:var(--bg-input);white-space:nowrap;">0개</span>
+        </div>
+        <div id="video-job-queue-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px;"></div>
+      </div>
+
       <!-- 프로세스 단계 / 선택 결과 -->
       <div class="g2">
         <!-- 파이프라인 단계 -->
@@ -13847,7 +13859,7 @@ const VIDEO_PROCESS_STEPS = [
   { id: 'transcript_quality_review', label: '전사 품질검토', desc: '오인식, 끊김, 반복, 어색한 문장 확인' },
   { id: 'crata_term_correction', label: 'CRATA 용어 교정', desc: '지식/결과지문구 기준으로 공식 용어 정리' },
   { id: 'speaker_review', label: '화자분리 검토', desc: '강사/질문자 라벨 뒤바뀜과 짧은 발화 확인' },
-  { id: 'subtitle_preview_review', label: '미리보기 검수', desc: '자막 크기, 위치, 색상, 가림 여부 확인' },
+  { id: 'subtitle_preview_review', label: '미리보기 검수', desc: '자막 크기, 위치, 색상, 가림 여부 확인 후 승인 필요' },
   { id: 'burnin', label: '자막 하드코딩', desc: '승인된 자막을 영상에 합성' },
   { id: 'final_encode', label: '최종 인코딩', desc: '승인 후 전체 길이 최종 렌더링' },
 ];
@@ -14959,6 +14971,76 @@ function renderVideoModelStatus(data) {
   `;
 }
 
+function videoQueueTone(item) {
+  const status = String(item?.status || '').toLowerCase();
+  if (item?.active || ['active', 'pending'].includes(status)) return { color: 'var(--yellow)', border: 'rgba(245,158,11,0.36)', bg: 'rgba(245,158,11,0.06)' };
+  if (status === 'queued') return { color: 'var(--blue)', border: 'rgba(59,130,246,0.36)', bg: 'rgba(59,130,246,0.06)' };
+  if (['done', 'completed'].includes(status)) return { color: 'var(--green)', border: 'rgba(16,185,129,0.32)', bg: 'rgba(16,185,129,0.05)' };
+  if (['error', 'cancelled'].includes(status)) return { color: 'var(--red)', border: 'rgba(239,68,68,0.34)', bg: 'rgba(239,68,68,0.05)' };
+  return { color: 'var(--text-muted)', border: 'var(--border)', bg: 'rgba(255,255,255,0.012)' };
+}
+
+function videoQueueLabel(item) {
+  const status = String(item?.status || '').toLowerCase();
+  return item?.status_label || {
+    active: '진행 중',
+    pending: '대기 중',
+    queued: '대기열',
+    done: '완료됨',
+    completed: '완료됨',
+    error: '실패',
+    cancelled: '중지됨',
+  }[status] || '대기';
+}
+
+function renderVideoJobQueue(items = []) {
+  const list = document.getElementById('video-job-queue-list');
+  const count = document.getElementById('video-job-queue-count');
+  if (!list) return;
+
+  const rows = Array.isArray(items) ? items : [];
+  const activeCount = rows.filter(item => item.active || ['active', 'pending'].includes(String(item.status || '').toLowerCase())).length;
+  const queuedCount = rows.filter(item => String(item.status || '').toLowerCase() === 'queued').length;
+  if (count) count.textContent = rows.length ? `${activeCount} 진행 · ${queuedCount} 대기` : '0개';
+
+  if (!rows.length) {
+    list.innerHTML = `
+      <div style="grid-column:1/-1;padding:14px;border:1px solid var(--border);border-radius:var(--radius-md);background:rgba(255,255,255,0.012);color:var(--text-muted);font-size:12px;">
+        아직 등록된 영상 작업이 없습니다.
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML = rows.slice(0, 12).map(item => {
+    const tone = videoQueueTone(item);
+    const progress = Math.max(0, Math.min(100, Math.round(Number(item.progress || 0))));
+    const sourceName = item.source_path ? videoPathName(item.source_path) : (item.file_count ? `${item.file_count}개 파일` : '소스 대기');
+    const time = formatShortDate(item.started_at || item.queued_at || item.created_at || item.updated_at);
+    const stepText = Array.isArray(item.steps) && item.steps.length ? item.steps.slice(0, 4).join(' · ') : '';
+    const meta = [time, item.file_count ? `${item.file_count}개` : '', item.active ? '실행 중' : ''].filter(Boolean).join(' · ');
+    return `
+      <div style="border:1px solid ${tone.border};border-radius:var(--radius-md);background:${tone.bg};padding:11px 12px;min-width:0;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:7px;">
+          <div style="min-width:0;">
+            <div style="font-size:12.5px;font-weight:800;color:var(--text-white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.title || sourceName)}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:3px;font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(sourceName)}</div>
+          </div>
+          <span style="font-size:10.5px;font-weight:850;color:${tone.color};padding:3px 7px;border-radius:999px;border:1px solid ${tone.border};background:rgba(0,0,0,0.16);white-space:nowrap;">${escapeHtml(videoQueueLabel(item))}</span>
+        </div>
+        <div style="height:5px;background:rgba(255,255,255,0.025);border:1px solid var(--border);border-radius:4px;overflow:hidden;">
+          <div style="height:100%;width:${progress}%;background:${tone.color};border-radius:4px;"></div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:7px;font-size:11px;color:var(--text-muted);">
+          <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(meta)}</span>
+          <span style="font-family:var(--font-mono);white-space:nowrap;">${progress}%</span>
+        </div>
+        ${stepText ? `<div style="font-size:11px;color:var(--text-muted);margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(stepText)}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
 // Real Polling from backend json (if running locally on webserver)
 function pollVideoStatus() {
   fetchWithTimeout(`${SERVER_URL}/api/video/status`, {}, 3000)
@@ -15076,6 +15158,7 @@ function updateVideoUI(data) {
   });
   renderVideoSystemMetrics(data);
   renderVideoModelStatus(data);
+  renderVideoJobQueue(data?.video_queue || []);
   ensureFinalTranscriptArtifact(data);
   
   // Update dashboard mini tracker too!
@@ -15207,7 +15290,9 @@ async function startVideoEncoding() {
       process_status: {},
       speaker_count: speakerCount,
     });
-    showToast('영상 인코딩 작업을 등록했습니다. 작업 지시서에서 진행 상황을 확인하세요.', 'success');
+    showToast(saved.task?.status === 'queued'
+      ? '진행 중인 영상 작업이 있어 대기열에 추가했습니다.'
+      : '영상 인코딩 작업을 등록했습니다. 작업 지시서에서 진행 상황을 확인하세요.', 'success');
     refreshAfterMutation(1000);
   } catch (error) {
     showToast(error.message || '영상 인코딩 작업 등록 중 오류가 발생했습니다.', 'warning');

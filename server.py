@@ -44,7 +44,7 @@ VIDEO_PROCESS_STEPS = [
     {'id': 'transcript_quality_review', 'label': '전사 품질검토', 'desc': '오인식, 끊김, 반복, 어색한 문장 확인'},
     {'id': 'crata_term_correction', 'label': 'CRATA 용어 교정', 'desc': '지식/결과지문구 기준으로 공식 용어 정리'},
     {'id': 'speaker_review', 'label': '화자분리 검토', 'desc': '강사/질문자 라벨 뒤바뀜과 짧은 발화 확인'},
-    {'id': 'subtitle_preview_review', 'label': '미리보기 검수', 'desc': '자막 크기, 위치, 색상, 가림 여부 확인'},
+    {'id': 'subtitle_preview_review', 'label': '미리보기 검수', 'desc': '자막 크기, 위치, 색상, 가림 여부 확인 후 승인 필요'},
     {'id': 'burnin', 'label': '자막 하드코딩', 'desc': '승인된 자막을 영상에 합성'},
     {'id': 'final_encode', 'label': '최종 인코딩', 'desc': '승인 후 전체 길이 최종 렌더링'},
 ]
@@ -1091,8 +1091,10 @@ def video_status_payload():
     try:
         task_matches = find_video_task_files()
         latest_video_task = task_matches[0][1] if task_matches else {}
+        status['video_queue'] = video_queue_payload()
     except Exception:
         latest_video_task = {}
+        status['video_queue'] = []
     if latest_video_task:
         task_active = latest_video_task.get('status') in ('pending', 'active') or task_process_alive(latest_video_task)
         try:
@@ -2120,6 +2122,103 @@ def find_video_task_files(task_id=''):
     return matches
 
 
+def video_queue_payload(limit=20):
+    items = []
+    for fpath, task in find_video_task_files():
+        try:
+            progress = int(task.get('progress') or 0)
+        except (TypeError, ValueError):
+            progress = 0
+        active = task.get('status') in ('pending', 'active') and task_process_alive(task)
+        items.append({
+            'id': task.get('id') or pathlib.Path(fpath).stem.removeprefix('task_'),
+            'title': task.get('title') or pathlib.Path(fpath).name,
+            'status': task.get('status') or '',
+            'status_label': task.get('statusLbl') or '',
+            'progress': max(0, min(100, progress)),
+            'active': bool(active),
+            'pid': task.get('pid') or '',
+            'source_path': task.get('videoSourcePath') or '',
+            'workspace_root': task.get('videoWorkspaceRoot') or '',
+            'file_count': task.get('videoFileCount') or 0,
+            'steps': task.get('videoSteps') if isinstance(task.get('videoSteps'), list) else [],
+            'created_at': task.get('created_at') or '',
+            'queued_at': task.get('queued_at') or '',
+            'started_at': task.get('started_at') or task.get('fallback_started_at') or '',
+            'updated_at': task.get('updated_at') or '',
+            'completed_at': task.get('completed_at') or '',
+            'cancelled_at': task.get('cancelled_at') or '',
+            'error': task.get('error') or '',
+        })
+    return items[:limit]
+
+
+def video_task_is_running(task):
+    status = task.get('status')
+    if status not in ('pending', 'active'):
+        return False
+    if status == 'queued':
+        return False
+    return task_process_alive(task)
+
+
+def should_queue_video_task(task, current_fpath=None):
+    if task.get('type') != 'video_encoding':
+        return False
+    current_key = str(current_fpath or '').lower()
+    for fpath, existing in find_video_task_files():
+        if current_key and str(fpath).lower() == current_key:
+            continue
+        if video_task_is_running(existing):
+            return True
+    return False
+
+
+def queued_video_task_files():
+    items = []
+    for fpath, task in find_video_task_files():
+        if task.get('status') in ('queued', 'pending') and not task_process_alive(task):
+            items.append((fpath, task))
+    items.sort(key=lambda item: item[1].get('created_at') or item[1].get('queued_at') or task_sort_stamp(item[1]))
+    return items
+
+
+def video_queue_blocked_by_user_action():
+    status = read_video_status()
+    return status.get('status') == 'waiting_preview_review'
+
+
+def auto_start_next_video_task():
+    if video_queue_blocked_by_user_action():
+        return None
+    if should_queue_video_task({'type': 'video_encoding'}):
+        return None
+    queued = queued_video_task_files()
+    if not queued:
+        return None
+
+    fpath, task = queued[0]
+    runner_preference = task.get('runnerPreference') if task.get('runnerPreference') in ('claude', 'codex') else 'codex'
+    update_task_file(fpath, lambda t: (
+        t.update({
+            'status': 'pending',
+            'statusLbl': '대기 중',
+            'progress': max(0, int(t.get('progress') or 0)),
+            'dequeued_at': now_iso(),
+        }),
+        append_task_log(t, '시스템', '이전 영상 작업이 끝나 대기열에서 자동 실행합니다.')
+    ))
+    start_task_worker(fpath, runner_preference)
+    return fpath
+
+
+def continue_video_queue_after_task(fpath):
+    task = read_json_file(fpath, {})
+    if task.get('type') != 'video_encoding':
+        return None
+    return auto_start_next_video_task()
+
+
 def cancel_video_encoding_task(data=None):
     data = data or {}
     task_id = str(data.get('taskId') or data.get('task_id') or '').strip()
@@ -2182,8 +2281,9 @@ def cancel_video_encoding_task(data=None):
         'updated_at': now_iso(),
     })
     write_json_file(VIDEO_STATUS_FILE, video_status)
+    next_task = auto_start_next_video_task()
 
-    return {'ok': not errors, 'stopped': stopped, 'errors': errors, 'videoStatus': video_status_payload()}
+    return {'ok': not errors, 'stopped': stopped, 'errors': errors, 'nextTask': str(next_task) if next_task else '', 'videoStatus': video_status_payload()}
 
 
 def find_existing_task_file(task):
@@ -2369,6 +2469,7 @@ def run_codex_task(fpath, claude_error='', claude_output='', fallback=False):
             }),
             append_task_log(t, '시스템', 'Codex CLI 실행에 실패했습니다.')
         ))
+        continue_video_queue_after_task(fpath)
         return
 
     update_task_file(fpath, lambda t: (
@@ -2456,6 +2557,7 @@ def run_codex_task(fpath, claude_error='', claude_output='', fallback=False):
             }),
             append_task_log(t, '시스템', f'Codex CLI가 종료 코드 {return_code}로 종료되었습니다.')
         ))
+    continue_video_queue_after_task(fpath)
 
 
 def run_codex_fallback_task(fpath, claude_error='', claude_output=''):
@@ -2618,6 +2720,7 @@ def run_claude_task(fpath):
             enrich_task_result(t, final_output or '(Claude가 빈 응답을 반환했습니다.)'),
             append_task_log(t, '시스템', 'Claude CLI 실행이 완료되었습니다.')
         ))
+        continue_video_queue_after_task(fpath)
     else:
         claude_error = f'Claude CLI 종료 코드: {return_code}'
         update_task_file(fpath, lambda t: (
@@ -2711,6 +2814,17 @@ def save_task_request(data, start=True):
         print(f'  → 작업 저장: {fpath.name}')
 
     if start:
+        if task.get('type') == 'video_encoding' and should_queue_video_task(task, current_fpath=fpath):
+            queued_task = update_task_file(fpath, lambda t: (
+                t.update({
+                    'status': 'queued',
+                    'statusLbl': '대기열',
+                    'progress': 0,
+                    'queued_at': now_iso(),
+                }),
+                append_task_log(t, '시스템', '진행 중인 영상 작업이 있어 대기열에 추가했습니다. 현재 작업이 끝나면 자동으로 시작합니다.')
+            ))
+            return queued_task, fpath
         start_task_worker(fpath, runner_preference)
     return task, fpath
 
@@ -3643,7 +3757,7 @@ def create_video_encoding_task(data):
             {'name': '영상담당', 'role': '영상 인코딩 파이프라인 실행', 'progress': 0, 'status': 'pending'},
         ],
     }, start=True)
-    return {'ok': True, 'task': task, 'videoStatus': status}
+    return {'ok': True, 'task': task, 'videoStatus': video_status_payload()}
 
 
 def create_video_transcript_review_task(data):
